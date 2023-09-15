@@ -78,10 +78,9 @@ def funcOffset(k, bdsSegments: list, data_list: list, functionName: str) -> floa
             print("Warring: \'" + functionName + "\' not found, check \'init.ini\'!")
             sys.exit()
 
-
-def tempSTL(lumenStl, segms3DLumen, bdsSegments, centerline, offset):
+def createDisplacementWall(lumenStl, segms3DLumen, bdsSegments, centerline, offset):
     cellArray= vtkCellArray()
-    cellArray.DeepCopy(lumenStl.GetPolys())
+    cellArray.DeepCopy(lumenStl.GetCells())
     pts = vtkPoints()
     pts.DeepCopy(lumenStl.GetPoints())
 
@@ -117,12 +116,12 @@ def tempSTL(lumenStl, segms3DLumen, bdsSegments, centerline, offset):
 
         offset2vec.append(multy(normalize(sub(centerline[int(minIdx + bdsSegments[2])], pt)), offset[minIdx]))
 
-    for j in range(1, 11):
+    for j in range(0, 10):
         tempPts = vtkPoints()
         tempPts.DeepCopy(pts)
         for i in range(0, len(listPts)):
             pt = tempPts.GetPoint(listPts[i])
-            tempPts.SetPoint(listPts[i], add(pt, truediv(offset2vec[i], j)))
+            tempPts.SetPoint(listPts[i], add(pt, multy(offset2vec[i], j/10)))
         tempPts.Modified()
         newPD = vtkPolyData()
         newPD.SetPoints(tempPts)

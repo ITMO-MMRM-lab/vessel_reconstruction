@@ -276,7 +276,7 @@ def runMesher(reader: Reader):
         lloyd=True,
         min_facet_angle=25.0,
         max_radius_surface_delaunay_ball=1.5,
-        max_facet_distance=0.008,
+        max_facet_distance=0.03,
         max_circumradius_edge_ratio=3.0,
         reorient=True
     )
