@@ -1,50 +1,8 @@
+from core import *
 import configparser
 import pandas
 import numpy as np
-from vtkmodules.all import (
-    vtkCellArray,
-    vtkPoints,
-    vtkPolyData,
-    vtkSTLReader,
-    vtkSTLWriter)
-
-
-def sub(pt1: list, pt2: list) -> list:
-    """
-    Vector difference.
-    """
-    return [a - b for a, b in zip(pt1, pt2)]
-
-def add(pt1: list, pt2: list) -> list:
-    """
-    Sum of vectors.
-    """
-    return [a + b for a, b in zip(pt1, pt2)]
-
-def truediv(pt: list, num: int) -> list:
-    """
-    Dividing a vector by a number.
-    """
-    return [a / num for a in pt]
-
-def multy(pt: list, num: float) -> list:
-    return [a * num for a in pt]
-
-def getNormal(segm: list) -> list:
-    """
-    Returns the normal to the surface using three points [0, 1, 2].
-    """
-    dir1 = sub(segm[0], segm[1])
-    dir2 = sub(segm[2], segm[1])
-    segm_normal = np.cross(dir1, dir2)
-    return segm_normal/np.linalg.norm(segm_normal)
-
-def getDistance(pt1: list, pt2: list) -> float:
-    vec = sub(pt1, pt2)
-    return np.sqrt(np.dot(vec, vec))
-
-def normalize(pt: list) ->list:
-    return truediv(pt, np.linalg.norm(pt))
+from vtkmodules.all import vtkSTLReader, vtkXMLUnstructuredGridReader
 
 
 class Reader(object):
@@ -70,12 +28,19 @@ class Reader(object):
         self.segms3DLumen = []
         self.segms3DWall = []
         self.isPrint = True
+        # list of centers segments
         self.centerline = []
+        # name of the offset function
+        self.funcOffset = self.config["DATA"]["functionOffset"]
+        # data .stl
+        self.lumenStl = self.readStl(self.config["DATA"]["PathLumenSTL"])
+        self.wallStl = self.readStl(self.config["DATA"]["PathWallSTL"])
 
     def update(self):
         self.readContours2D()
         self.readXLSX()
         self.readContours3D()
+        self.correctingOrderOfSegments()
 
     def correctingOrderOfSegments(self):
         """
@@ -129,81 +94,6 @@ class Reader(object):
         if self.isPrint:
             print('New number of lumen contours: ', len(self.segms3DLumen))
     
-    def checkIntersections(self):
-        """
-        Checking for intersections between adjacent sections.
-        """
-        if self.isPrint:
-            print('\nCheck intersections...') 
-
-        badlist = []
-
-        for i in range(1, len(self.segms3DLumen)-1, 2):
-            flg = True
-            normal = getNormal(self.segms3DLumen[i])
-            for pt1 in self.segms3DLumen[i]:
-                for pt2 in self.segms3DLumen[i - 1]:
-                    p2f = sub(pt1, pt2)
-                    d = np.dot(p2f, normal)
-                    flg *= (d > 0)
-
-                for pt2 in self.segms3DLumen[i + 1]:
-                    p2f = sub(pt1, pt2)
-                    d = np.dot(p2f, normal)
-                    flg *= (d < 0)
-
-            if not flg:
-                badlist.append(i)
-
-        for i in sorted(badlist, reverse=True):
-            del self.segms3DLumen[i]         
-        if self.isPrint:
-            print('New number of lumen contours: ', len(self.segms3DLumen))   
-
-    def simplifySegments(self, dist=0.5, n=1, maxPts = 40):
-        """
-        Delete some points and segments.
-
-        dist - required distance between segments,\n
-        n - number of iterations,\n
-        maxPts - required number of points in the segment.
-        """
-        if self.isPrint:
-            print('\nSimplify segments...')  
-        
-        npts = []
-        for segm in self.segms3DLumen:
-            npts.append(len(segm))
-        if (np.min(npts) > maxPts):
-            maxPts = np.min(npts)
-
-
-        for segm in self.segms3DLumen:
-            k = int(len(segm)/maxPts)
-            for i in range(len(segm)-1, 0, -1):
-                if i%k !=0:
-                    del segm[i]
-        
-        for j in range(0, n):
-            badlist = []
-            for i in range(0, len(self.segms3DLumen)-1, 2):
-                flg = True
-                for pt1 in self.segms3DLumen[i]:
-                    for pt2 in self.segms3DLumen[i - 1]:
-                        p2f = sub(pt1, pt2)
-                        flg *= np.linalg.norm(p2f) > dist
-
-                    for pt2 in self.segms3DLumen[i + 1]:
-                        p2f = sub(pt1, pt2)
-                        flg *= np.linalg.norm(p2f) > dist
-                if not flg:
-                    badlist.append(i)
-
-            for i in sorted(badlist, reverse=True):
-                del self.segms3DLumen[i]           
-        if self.isPrint:
-            print('New number of lumen contours: ', len(self.segms3DLumen))       
-
     def readXLSX(self):
         """
         Search for parameter values in the table.
@@ -214,7 +104,7 @@ class Reader(object):
             self.data_list.append(float(table.loc[maskID, i].iat[0]))
         if self.isPrint:
             print('\nParameters:')
-            print(self.data_list)
+            print(["%.2f" % var for var in self.data_list])
 
     def readContours2D(self):
         """
@@ -233,9 +123,8 @@ class Reader(object):
             self.bdsSegments[3] = int(lines[len(lines)-1].split(' ')[0])
 
         if self.isPrint:
-            print('segment numbers [initVessel, finVessel, initStent, finStent]:')
-            print(self.bdsSegments)
-    
+            print('Segment numbers:\n[initVessel, finVessel, initStent, finStent] = ',self.bdsSegments)
+
     def readContours3D(self):
         """
         Read .ctr file.
@@ -267,84 +156,15 @@ class Reader(object):
                     continue
                 points3.append([float(line[0]), float(line[1]), float(line[2])])
             segms3D.append(points3.copy())
-
-    def createCenterline(self):
-        for pts in self.segms3DLumen:
-            newPt = [0., 0., 0.]
-            for pt in pts:
-                newPt = add(newPt, pt)
-            newPt = truediv(newPt, len(pts))
-            self.centerline.append(newPt)
-
-    def readStl(self):
+    
+    def readStl(self, filename):
         reader = vtkSTLReader()
-        reader.SetFileName(self.config["DATA"]["PathLumenSTL"])
+        reader.SetFileName(filename)
         reader.Update()
-        self.lumenStl = reader.GetOutput()
+        return reader.GetOutput()
     
-    def writeStl(self, polydata, filename):
-        writer = vtkSTLWriter()
-        writer.SetFileName(filename)
-        writer.SetInputData(polydata)
-        writer.Write()
-       
-    def calcOffset(self):
-        self.offset = []
-        N = self.bdsSegments[3]-self.bdsSegments[2]
-        for i in range(0, N):
-            self.offset.append(self.funcSin(i))
-    
-    def funcSin(self, k):
-        return (np.abs(self.data_list[5] - self.data_list[6]) *
-                (np.sin(np.pi*k/(self.bdsSegments[3]-self.bdsSegments[2]))))
-    
-    def tempSTL(self):
-        cellArray= vtkCellArray()
-        cellArray.DeepCopy(self.lumenStl.GetPolys())
-        pts = vtkPoints()
-        pts.DeepCopy(self.lumenStl.GetPoints())
-
-        listPts = [] #idx pts por preparation
-
-        segm_init = self.segms3DLumen[self.bdsSegments[2]]
-        segm_init_normal = getNormal(segm_init)
-        segm_fin = self.segms3DLumen[self.bdsSegments[3]]
-        segm_fin_normal = getNormal(segm_fin)
-        
-        for i in range(0, pts.GetNumberOfPoints()):
-            flg = True
-            pt = pts.GetPoint(i)
-
-            p2f_init = sub(segm_init[0], pt)
-            d_init = np.dot(p2f_init, segm_init_normal)
-            flg *= d_init < 0
-                
-            p2f_fin = sub(segm_fin[0], pt)
-            d_fin = np.dot(p2f_fin, segm_fin_normal)
-            flg *= d_fin > 0
-
-            if flg:
-                listPts.append(i)
-
-        offset2vec = []
-        for i in listPts:
-            pt = pts.GetPoint(i)
-            listdist = []
-            for j in range(self.bdsSegments[2], self.bdsSegments[3]):
-                listdist.append(getDistance(pt, self.centerline[j]))
-            minIdx = np.argmin(listdist)
-
-            offset2vec.append(multy(normalize(sub(self.centerline[int(minIdx+self.bdsSegments[2])], pt)), self.offset[minIdx]))
-
-        for j in range(1, 11):
-            tempPts = vtkPoints()
-            tempPts.DeepCopy(pts)
-            for i in range(0, len(listPts)):
-                pt = tempPts.GetPoint(listPts[i])
-                tempPts.SetPoint(listPts[i], add(pt, truediv(offset2vec[i], j)))
-            tempPts.Modified()
-            newPD = vtkPolyData()
-            newPD.SetPoints(tempPts)
-            newPD.SetPolys(cellArray)
-
-            self.writeStl(newPD ,'data/result/offset_' + str(j) + '.stl')
+    def readUnstructuredGrid(self, filename):
+        reader = vtkXMLUnstructuredGridReader()
+        reader.SetFileName(filename)
+        reader.Update()
+        self.volumeMesh = reader.GetOutput()
