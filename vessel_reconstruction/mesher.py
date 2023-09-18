@@ -254,25 +254,23 @@ def vtu2csv(filename, outpath):
     elemsfile.close()
 
 def runMesher(reader: Reader):
-    outpath = 'data/result/'
-
     print("Mesher: Center line VMTK calculation...")
-    calcCenterLine(reader.lumenStl, outpath)
-    centerLine = readCenterLineVTP(outpath)
+    calcCenterLine(reader.lumenStl, reader.outpath)
+    centerLine = readCenterLineVTP(reader.outpath)
 
     print("Mesher: Vessel generation...")
     newWall = generateWall(reader.lumenStl, reader.wallStl, centerLine)
     vesselPolyData = closeSurface(reader.lumenStl, newWall)
 
     writerVTP = vtkSTLWriter()
-    writerVTP.SetFileName(outpath + 'vessel.stl')
+    writerVTP.SetFileName(reader.outpath + 'vessel.stl')
     writerVTP.SetInputData(vesselPolyData)
     writerVTP.Write()
 
     # Triangulate:
     print("Mesher: Volume mesh generation....")
     mesh = pygalmesh.generate_volume_mesh_from_surface_mesh(
-        outpath + 'vessel.stl',
+        reader.outpath + 'vessel.stl',
         lloyd=True,
         min_facet_angle=25.0,
         max_radius_surface_delaunay_ball=1.5,
@@ -282,7 +280,7 @@ def runMesher(reader: Reader):
     )
 
     print("Mesher: Writing results to a file.")
-    mesh.write(outpath + "volumeMesh.vtu", 'vtu')
-    vtu2csv("volumeMesh.vtu", outpath)
+    mesh.write(reader.outpath + "volumeMesh.vtu", 'vtu')
+    vtu2csv("volumeMesh.vtu", reader.outpath)
 
     print("Mesher:done!")

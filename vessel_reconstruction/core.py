@@ -4,46 +4,25 @@ from vtkmodules.all import (
     vtkCellArray,
     vtkPoints,
     vtkPolyData)
-from writer import writePolyDataAsSTL
+from writer import writeDisplacementsCSV,writePolyDataAsSTL
 
 #-------------------------------------#
 #some operations on vectors
-def sub(pt1: list, pt2: list) -> list:
-    """
-    Vector difference.
-    """
-    return [a - b for a, b in zip(pt1, pt2)]
-
-def add(pt1: list, pt2: list) -> list:
-    """
-    Sum of vectors.
-    """
-    return [a + b for a, b in zip(pt1, pt2)]
-
-def truediv(pt: list, num: int) -> list:
-    """
-    Dividing a vector by a number.
-    """
-    return [a / num for a in pt]
-
-def multy(pt: list, num: float) -> list:
-    return [a * num for a in pt]
-
-def getNormal(segm: list) -> list:
+def getFaceNormal(segm: list) -> list:
     """
     Returns the normal to the surface using three points [0, 1, 2].
     """
-    dir1 = sub(segm[0], segm[1])
-    dir2 = sub(segm[2], segm[1])
+    dir1 = np.diff([segm[1], segm[0]], axis=0)[0]
+    dir2 = np.diff([segm[1], segm[2]], axis=0)[0]
     segm_normal = np.cross(dir1, dir2)
     return segm_normal/np.linalg.norm(segm_normal)
 
 def getDistance(pt1: list, pt2: list) -> float:
-    vec = sub(pt1, pt2)
+    vec = np.diff([pt2, pt1], axis=0)[0]
     return np.sqrt(np.dot(vec, vec))
 
 def normalize(pt: list) -> list:
-    return truediv(pt, np.linalg.norm(pt))
+    return np.divide(pt, np.linalg.norm(pt))
 
 #-------------------------------------#
 #preparation the data
@@ -53,8 +32,8 @@ def createCenterline(segms: list) -> list:
     for pts in segms:
         newPt = [0., 0., 0.]
         for pt in pts:
-            newPt = add(newPt, pt)
-        newPt = truediv(newPt, len(pts))
+            newPt = np.add.reduce([newPt, pt])
+        newPt = np.divide(newPt, len(pts))
         centerline.append(newPt)  
     return centerline  
 
@@ -84,22 +63,22 @@ def createDisplacementWall(lumenStl, segms3DLumen, bdsSegments, centerline, offs
     pts = vtkPoints()
     pts.DeepCopy(lumenStl.GetPoints())
 
-    listPts = [] #idx pts por preparation
+    listPts = [] #idx pts for preparation
 
     segm_init = segms3DLumen[bdsSegments[2]]
-    segm_init_normal = getNormal(segm_init)
+    segm_init_normal = getFaceNormal(segm_init)
     segm_fin = segms3DLumen[bdsSegments[3]]
-    segm_fin_normal = getNormal(segm_fin)
+    segm_fin_normal = getFaceNormal(segm_fin)
         
     for i in range(0, pts.GetNumberOfPoints()):
         flg = True
         pt = pts.GetPoint(i)
 
-        p2f_init = sub(segm_init[0], pt)
+        p2f_init = np.diff([pt, segm_init[0]], axis=0)[0]
         d_init = np.dot(p2f_init, segm_init_normal)
         flg *= d_init < 0
                 
-        p2f_fin = sub(segm_fin[0], pt)
+        p2f_fin = np.diff([pt, segm_fin[0]], axis=0)[0]
         d_fin = np.dot(p2f_fin, segm_fin_normal)
         flg *= d_fin > 0
 
@@ -113,18 +92,21 @@ def createDisplacementWall(lumenStl, segms3DLumen, bdsSegments, centerline, offs
         for j in range(bdsSegments[2], bdsSegments[3]):
             listdist.append(getDistance(pt, centerline[j]))
         minIdx = np.argmin(listdist)
-
-        offset2vec.append(multy(normalize(sub(centerline[int(minIdx + bdsSegments[2])], pt)), offset[minIdx]))
+        
+        norm_vec = normalize(np.diff([pt, centerline[int(minIdx + bdsSegments[2])]], axis=0)[0])
+        offset2vec.append(np.multiply(norm_vec, offset[minIdx]))
 
     for j in range(0, 10):
         tempPts = vtkPoints()
         tempPts.DeepCopy(pts)
         for i in range(0, len(listPts)):
             pt = tempPts.GetPoint(listPts[i])
-            tempPts.SetPoint(listPts[i], add(pt, multy(offset2vec[i], j/10)))
+            tempPts.SetPoint(listPts[i], np.add.reduce([pt, np.multiply(offset2vec[i], j/10)]))
         tempPts.Modified()
         newPD = vtkPolyData()
         newPD.SetPoints(tempPts)
         newPD.SetPolys(cellArray)
 
-        writePolyDataAsSTL('data/result/offset_' + str(j) + '.stl', newPD)
+        writePolyDataAsSTL('data/output/offset_' + str(j) + '.stl', newPD)  #TODO: весь вывод должен быть в writer.py
+    
+    writeDisplacementsCSV('data/output/disp.csv', pts, [[0.0]*3] * pts.GetNumberOfPoints())

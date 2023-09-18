@@ -2,7 +2,8 @@ from vtkmodules.all import (
     vtkPoints,
     vtkXMLPolyDataWriter,
     vtkSTLWriter)
-from core import *
+import numpy as np
+
 
 def writeSegmentsCSV(filename, segments):
     with open(filename, 'w', encoding='utf-8') as file:
@@ -11,13 +12,8 @@ def writeSegmentsCSV(filename, segments):
                 file.write(str(pt3[0]) + ' ' + str(pt3[1]) + ' ' + str(pt3[2]) + '\n')
 
 def writePointsCSV(filename, points):
-    with open('output2.txt', 'w', encoding='utf-8') as file:
+    with open(filename, 'w', encoding='utf-8') as file:
         for pt3 in points:
-            file.write(str(pt3[0]) + ' ' + str(pt3[1]) + ' ' + str(pt3[2]) + '\n')
-
-def writeCenterLine(filename, cline):
-    with open('data/result/centerline.txt', 'w', encoding='utf-8') as file:
-        for pt3 in cline:
             file.write(str(pt3[0]) + ' ' + str(pt3[1]) + ' ' + str(pt3[2]) + '\n')
 
 def writePolyDataAsSTL(filename, polydata):
@@ -36,25 +32,26 @@ def writeDisplacementsCSV(filename, points: vtkPoints, offsets):
     '''
     filename - path to file\n
     poitns - is an array of vx-vy-vz triplets accessible by (point or cell) id\n
-    offset - is an array of vx-vy-vz triplets, characterizes the displacement of a point
+    offset - is an array of vx-vy-vz triplets, characterizes the displacement of a point\n
+    ! the structure is similar to exporting displacements from ABAQUS !
     '''
     with open(filename, 'w', encoding='utf-8') as file:
-        file.write('Initial coordinates')
-        line = ''
+        file.write('Initial coordinates\n')
+
         for i in range(0, points.GetNumberOfPoints()):
             pt = points.GetPoint(i)
-            #TODO: FIX IT! ->
-            line += str(i+1) + '\t' + str(pt[0]) + '\t' +  str(pt[1]) + '\t' +  str(pt[2]) + '\t'
-        file.write(line)
-        file.write('Displacements')
+            file.write(str(i+1) + '\t' + str(pt[0]) + '\t' +  str(pt[1]) + '\t' +  str(pt[2]) + '\t')
+        file.write('\nDisplacements\n')
 
+        #TODO: думаю, стоит пересмотреть траекторию смещений. В данном случае все линейно.
         for i in range(0, 10):
             line = []
             tempPts = vtkPoints()
             tempPts.DeepCopy(points)
             for j in range(0, tempPts.GetNumberOfPoints()):
-                pt = add(tempPts.GetPoint(j), multy(offsets[j], i/10))
-                diff = sub(tempPts.GetPoint(j), pt)
-                line += str(j+1) + '\t' + str(pt[0]) + '\t' +  str(pt[1]) + '\t' +  str(pt[2]) + '\t'
-
+                pt = np.add.reduce([tempPts.GetPoint(j), np.multiply(offsets[j], i/10.0)], axis=0)
+                diff = np.diff([pt, tempPts.GetPoint(j)], axis=0)[0]
+                file.write(str(j+1) + '\t' + str(diff[0]) + '\t' +  str(diff[1]) + '\t' +  str(diff[2]) + '\t')
+            file.write('\n')
+        
 
