@@ -14,13 +14,19 @@ class Reader(object):
         self.outpath = self.config["CONFIG"]["PathOutput"]
         # column names in the table:
         self.param = [
-            'OBSTRUCTION: DIAMETER STENOSIS PRE (%)',
-            'STENT: DIAMETER STENOSIS POST (%)',
-            'VESSEL: DIAMETER STENOSIS POST (%)',
-            'VESSEL: MEAN LUMEN DIAMETER PRE (mm)',
-            'VESSEL: MEAN LUMEN DIAMETER POST (mm)',
-            'OBSTRUCTION: MINIMUM LUMEN DIAMETER PRE (mm)',
-            'IN-SEGMENT: MINIMUM LUMEN DIAMETER POST (mm)']
+            'OBSTRUCTION: DIAMETER STENOSIS PRE (%)',           #0
+            'STENT: DIAMETER STENOSIS POST (%)',                #1
+            'VESSEL: DIAMETER STENOSIS POST (%)',               #2
+            'VESSEL: MEAN LUMEN DIAMETER PRE (mm)',             #3
+            'VESSEL: MEAN LUMEN DIAMETER POST (mm)',            #4
+            'OBSTRUCTION: MINIMUM LUMEN DIAMETER PRE (mm)',     #5
+            'IN-SEGMENT: MINIMUM LUMEN DIAMETER POST (mm)',     #6
+            'VESSEL: MAXIMUM LUMEN DIAMETER POST (mm)',         #7
+            'DIST: MAXIMUM LUMEN DIAMETER POST (mm)',           #8
+            'PROX: MAXIMUM LUMEN DIAMETER POST (mm)',           #9
+            'STENT: MAXIMUM LUMEN DIAMETER POST (mm)',          #10
+            'IN-SEGMENT: MAXIMUM LUMEN DIAMETER POST (mm)'      #11
+            ] #TODO: add MAX_LUM_DIAM
         
         # parameter values
         self.data_list = []
@@ -31,7 +37,7 @@ class Reader(object):
         # list of segments3d [[[point3,..],...],[[point3,..],...],...]
         self.segms3DLumen = []
         self.segms3DWall = []
-        self.isPrint = True
+        self.isPrint = False
 
         # list of centers segments
         self.centerline = []
@@ -40,8 +46,8 @@ class Reader(object):
         self.funcOffset = self.config["CONFIG"]["functionOffset"]
 
         # data .stl
-        self.lumenStl = self.readStl(self.config["CONFIG"]["PathLumenSTL"])
-        self.wallStl = self.readStl(self.config["CONFIG"]["PathWallSTL"])
+        self.lumenStl = self.readStl('data/' + self.config["CONFIG"]["ID"] + '/' + self.config["CONFIG"]["ID"] + '-BL/LUMEN/Lumen_mesh.stl')
+        self.wallStl = self.readStl('data/' + self.config["CONFIG"]["ID"] + '/' + self.config["CONFIG"]["ID"] + '-BL/VESSEL WALL/VesselWall_mesh.stl')
 
     def update(self):
         """
@@ -122,12 +128,12 @@ class Reader(object):
         Search for the initial and final numbers segments of the stented vessel
         param.
         """
-        with open(self.config["CONFIG"]["PathLumenContours"]) as file:
+        with open('data/' + self.config["CONFIG"]["ID"] + '/' + self.config["CONFIG"]["ID"] + '-BL/CONTOURS/LumenExport.ctr') as file:
             lines = file.readlines()
             self.bdsSegments[0] = int(lines[2].split(' ')[0])
             self.bdsSegments[1] = int(lines[len(lines)-1].split(' ')[0])
 
-        with open(self.config["CONFIG"]["PathStentContours"]) as file:
+        with open('data/' + self.config["CONFIG"]["ID"] + '/' + self.config["CONFIG"]["ID"] + '-BL/CONTOURS/StentExport.ctr') as file:
             lines = file.readlines()
             self.bdsSegments[2] = int(lines[2].split(' ')[0])
             self.bdsSegments[3] = int(lines[len(lines)-1].split(' ')[0])
@@ -140,14 +146,14 @@ class Reader(object):
         Read .ctr file.
         Creates a field of points based on data from the file.
         """
-        self.__readContours3D('PathLumen3DContours', self.segms3DLumen)
-        self.__readContours3D('PathWall3DContours', self.segms3DWall)   
+        self.__readContours3D('data/' + self.config["CONFIG"]["ID"] + '/' + self.config["CONFIG"]["ID"] + '-BL/LUMEN/Lumen_contours_3d.txt', self.segms3DLumen)
+        self.__readContours3D('data/' + self.config["CONFIG"]["ID"] + '/' + self.config["CONFIG"]["ID"] + '-BL/VESSEL WALL/VesselWall_contours_3d.txt', self.segms3DWall)   
         if self.isPrint:
             print('Number of lumen contours: ', len(self.segms3DLumen))
             print('Number of wall contours: ', len(self.segms3DWall))
 
     def __readContours3D(self, pathName, segms3D):
-        with open(self.config['CONFIG'][pathName]) as file:
+        with open(pathName) as file:
             lines = file.readlines()
             npts = -1
             points3 = []
