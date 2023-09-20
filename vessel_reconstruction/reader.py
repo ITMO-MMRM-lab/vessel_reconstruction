@@ -25,7 +25,8 @@ class Reader(object):
             'DIST: MAXIMUM LUMEN DIAMETER POST (mm)',           #8
             'PROX: MAXIMUM LUMEN DIAMETER POST (mm)',           #9
             'STENT: MAXIMUM LUMEN DIAMETER POST (mm)',          #10
-            'IN-SEGMENT: MAXIMUM LUMEN DIAMETER POST (mm)'      #11
+            'IN-SEGMENT: MAXIMUM LUMEN DIAMETER POST (mm)',     #11
+            'VESSEL: MINIMUM LUMEN DIAMETER POST (mm)'          #12
             ] #TODO: add MAX_LUM_DIAM
         
         # parameter values
@@ -37,7 +38,8 @@ class Reader(object):
         # list of segments3d [[[point3,..],...],[[point3,..],...],...]
         self.segms3DLumen = []
         self.segms3DWall = []
-        self.isPrint = False
+
+        self.isPrint = True
 
         # list of centers segments
         self.centerline = []

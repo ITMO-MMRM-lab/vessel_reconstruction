@@ -1,6 +1,6 @@
 # !/usr/bin/env python
 from reader import Reader
-from core import createCenterline, calcOffset, createDisplacementWall, testvtkCliper, analysisOfVessel
+from core import createCenterline, calcOffset, createDisplacementWall, analysisOfVessel
 from mesher import runMesher
 import os
 

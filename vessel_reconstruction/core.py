@@ -142,6 +142,7 @@ def analysisOfVessel(vessel, cline, bdsSegms, param):
         npts = pts.GetNumberOfPoints()
 
         sum_chord = 0.
+        # можно сделать оптимальнее? сократить количество итераций в 2 раза
         for j in range(0, npts):
             max_chord = 0.
             for k in range(0, npts):
@@ -159,6 +160,7 @@ def analysisOfVessel(vessel, cline, bdsSegms, param):
     
     print('VESSEL: MEAN LUMEN DIAMETER: ',      param[4], ' - ', np.mean(diams), ' = ', param[4] - np.mean(diams))
     print('IN-SEG: MINIMUM LUMEN DIAMETER: ',   param[6], ' - ', np.min(diams[bdsSegms[0]:bdsSegms[1]]), ' = ', param[6] - np.min(diams[bdsSegms[0]:bdsSegms[1]]))
+    print('VESSEL: MINIMUM LUMEN DIAMETER: ',   param[12], ' - ', np.min(diams), ' = ', param[12] - np.min(diams))
 
     pr_stenosis = (1 - np.min(diams)/np.mean(diams))*100
     print('STENT: DIAMETER STENOSIS (%): ', param[1], ' - ', pr_stenosis,  ' = ', param[1] - pr_stenosis) 
