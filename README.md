@@ -16,8 +16,7 @@ $ conda activate <name_env>
 ```
 
 >[!IMPORTANT]
-> The VMTK library is available only for conda,  http://www.vmtk.org/download/.
-
+> The [vmtk](http://www.vmtk.org/download/) library is available only for conda.
 
 6. Run: 
 ```console
