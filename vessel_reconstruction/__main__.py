@@ -15,7 +15,9 @@ def main():
 
     reader.readUnstructuredGrid(reader.outpath + 'volumeMesh.vtu')
 
-    dataAlg = DataAlgorithms(reader.volumeMesh, reader.segms3DLumen, reader.bdsSegments, reader.data_list, reader.funcOffset)
+    dataAlg = DataAlgorithms(reader.volumeMesh, reader.lumenStl, reader.segms3DLumen, reader.bdsSegments, reader.data_list, reader.funcOffset)
+
+    dataAlg.analysisOfVessel(dataAlg.prelumen, dataAlg.cline, reader.bdsSegments, reader.data_list)
 
     writeDisplacementsCSV('data/output/vessel_disp.csv', reader.volumeMesh.GetPoints(), dataAlg.displs, 10)
 
