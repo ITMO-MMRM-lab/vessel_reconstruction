@@ -11,10 +11,10 @@ def main():
     reader.update()
   
     if not os.path.isfile(reader.outpath + 'volumeMesh.vtu'):
-        runMesher(reader)
+        runMesher(reader.lumenStl, reader.wallStl, reader.outpath)
 
     reader.readUnstructuredGrid(reader.outpath + 'volumeMesh.vtu')
-    
+
     dataAlg = DataAlgorithms(reader.volumeMesh, reader.segms3DLumen, reader.bdsSegments, reader.data_list, reader.funcOffset)
 
     writeDisplacementsCSV('data/output/vessel_disp.csv', reader.volumeMesh.GetPoints(), dataAlg.displs, 10)
