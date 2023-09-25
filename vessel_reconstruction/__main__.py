@@ -1,26 +1,26 @@
 # !/usr/bin/env python
 from reader import Reader
-from core import createCenterline, calcOffset, createDisplacementWall, analysisOfVessel
+from core import DataAlgorithms
 from mesher import runMesher
+from writer import writeDisplacementsCSV, writePolyDataAsSTL
 import os
 
 
 def main():
     reader = Reader(os.getcwd() + '/config/init.ini')
     reader.update()
-
-    centerline = createCenterline(reader.segms3DLumen)
-
-    analysisOfVessel(reader.lumenStl, centerline, reader.bdsSegments, reader.data_list)
-    
-    offset = calcOffset(reader.bdsSegments, reader.data_list, reader.funcOffset)
   
     if not os.path.isfile(reader.outpath + 'volumeMesh.vtu'):
         runMesher(reader)
 
     reader.readUnstructuredGrid(reader.outpath + 'volumeMesh.vtu')
+    
+    dataAlg = DataAlgorithms(reader.volumeMesh, reader.segms3DLumen, reader.bdsSegments, reader.data_list, reader.funcOffset)
 
-    createDisplacementWall(reader.volumeMesh, reader.segms3DLumen, reader.bdsSegments, centerline, offset)
+    writeDisplacementsCSV('data/output/vessel_disp.csv', reader.volumeMesh.GetPoints(), dataAlg.displs, 10)
+
+    for i in range(0, len(dataAlg.trajs)):
+        writePolyDataAsSTL('data/output/offsetVessel_' + str(i) + '.stl', dataAlg.trajs[i])
 
 
 if __name__ == '__main__':

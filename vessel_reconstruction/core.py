@@ -29,138 +29,144 @@ def normalize(pt: list) -> list:
 #-------------------------------------#
 #preparation the data
 
-def createCenterline(segms: list) -> list:
-    centerline = []
-    for pts in segms:
-        newPt = [0., 0., 0.]
-        for pt in pts:
-            newPt = np.add.reduce([newPt, pt])
-        newPt = np.divide(newPt, len(pts))
-        centerline.append(newPt)  
-    return centerline  
-
-def calcOffset(bdsSegments: list, data_list: list, functionName: str) -> list:
-    '''
-    The function calculates scalar offsets for each segment using a given function.
-    '''
-    offset = []
-    N = bdsSegments[3] - bdsSegments[2]
-    for i in range(0, N):
-        offset.append(funcOffset(i, bdsSegments, data_list, functionName))    
-    return offset
-   
-def funcOffset(k, bdsSegments: list, data_list: list, functionName: str) -> float:
-    match functionName:
-        case "sin":
-            # f(k) = (delta_min_diam/2)*sin(pi*k/N_s)
-            return (np.abs(data_list[5] - data_list[6]) *
-                    (np.sin(np.pi * k / (bdsSegments[3] - bdsSegments[2]))))
-        case "s-curve":
-            print("Warring: \'s-curve\' has not been implemented yet!")
-            return 0
-        case _:
-            print("Warring: \'" + functionName + "\' not found, check \'init.ini\'!")
-            sys.exit()
-
-#TODO: возможно, это стоит обернуть в отельный класс..?
-def createDisplacementWall(volumeMesh, segms3DLumen, bdsSegments, centerline, offset, steps=10):
-    cellArray= vtkCellArray()
-    cellArray.DeepCopy(volumeMesh.GetCells())
-    pts = vtkPoints()
-    pts.DeepCopy(volumeMesh.GetPoints())
-
-    listPts = [] #idx pts for preparation
-
-    segm_init = segms3DLumen[bdsSegments[2]]
-    segm_init_normal = getFaceNormal(segm_init)
-    segm_fin = segms3DLumen[bdsSegments[3]]
-    segm_fin_normal = getFaceNormal(segm_fin)
-        
-    for i in range(0, pts.GetNumberOfPoints()):
-        flg = True
-        pt = pts.GetPoint(i)
-
-        p2f_init = np.diff([pt, segm_init[0]], axis=0)[0]
-        d_init = np.dot(p2f_init, segm_init_normal)
-        flg *= d_init < 0
-                
-        p2f_fin = np.diff([pt, segm_fin[0]], axis=0)[0]
-        d_fin = np.dot(p2f_fin, segm_fin_normal)
-        flg *= d_fin > 0
-
-        if flg:
-            listPts.append(i)
-
-    offset2vec = []
-    for i in listPts:
-        pt = pts.GetPoint(i)
-        listdist = []
-        for j in range(bdsSegments[2], bdsSegments[3]):
-            listdist.append(getDistance(pt, centerline[j]))
-        minIdx = np.argmin(listdist)
-        
-        norm_vec = normalize(np.diff([pt, centerline[int(minIdx + bdsSegments[2])]], axis=0)[0])
-        offset2vec.append(np.multiply(norm_vec, offset[minIdx]))
-
-    for j in range(0, steps):
-        tempPts = vtkPoints()
-        tempPts.DeepCopy(pts)
-        for i in range(0, len(listPts)):
-            pt = tempPts.GetPoint(listPts[i])
-            tempPts.SetPoint(listPts[i], np.add.reduce([pt, np.multiply(offset2vec[i], j/10)]))
-        newPD = vtkPolyData()
-        newPD.SetPoints(tempPts)
-        newPD.SetPolys(cellArray)
-        writePolyDataAsSTL('data/output/offsetVessel_' + str(j) + '.stl', newPD)  #TODO: весь вывод должен быть в writer.py
-
-    allOffset = [[0.0]*3] * pts.GetNumberOfPoints()
-    for i in range(0, len(listPts)):
-        allOffset[listPts[i]] = offset2vec[i]
-
-    writeDisplacementsCSV('data/output/vessel_disp.csv', pts, allOffset, steps)
-
-
-def analysisOfVessel(vessel, cline, bdsSegms, param):
-    '''
-    Calculates max, min, mean, % of stenosis.
-     - vessel: lumen surface, polydata from stl
-     - cline: centerLine from createCenterline(...), ordered array of points
-     - bdsSegms: segment numbers [initVessel, finVessel, initStent, finStent]
-    '''   
-    diams = []
-    for i in range(0, len(cline) - 1):
-        plane = vtkPlane()
-        plane.SetOrigin(cline[i])
-        plane.SetNormal(normalize(np.diff([cline[i+1], cline[i]], axis=0)[0]))
-
-        cutter = vtkCutter()
-        cutter.SetInputData(vessel)
-        cutter.SetCutFunction(plane)
-        cutter.Update()
-
-        pts = cutter.GetOutput().GetPoints()
-        npts = pts.GetNumberOfPoints()
-
-        sum_chord = 0.
-        # можно сделать оптимальнее? сократить количество итераций в 2 раза
-        for j in range(0, npts):
-            max_chord = 0.
-            for k in range(0, npts):
-                d_jk = getDistance(pts.GetPoint(j), pts.GetPoint(k))
-                if (d_jk > max_chord):
-                    max_chord = d_jk
-            sum_chord += max_chord
-        diams.append(sum_chord/npts)
-
-    print('VESSEL: MAXIMUM LUMEN DIAMETER: ',   param[7], ' - ', np.max(diams), ' = ' ,param[7] - np.max(diams))
-    print('DIST: MAXIMUM LUMEN DIAMETER: ',     param[8], ' - ', np.max(diams[0:bdsSegms[0]]), ' = ', param[8] - np.max(diams[0:bdsSegms[0]]))
-    print('PROX: MAXIMUM LUMEN DIAMETER: ',     param[9], ' - ', np.max(diams[bdsSegms[1]:(len(cline) - 1)]), ' = ', param[9] - np.max(diams[bdsSegms[1]:(len(cline) - 1)]))
-    print('STENT: MAXIMUM LUMEN DIAMETER: ',    param[10], ' - ', np.max(diams[bdsSegms[2]:bdsSegms[3]]), ' = ', param[10] - np.max(diams[bdsSegms[2]:bdsSegms[3]]))
-    print('IN-SEG: MAXIMUM LUMEN DIAMETER: ',   param[11], ' - ', np.max(diams[bdsSegms[0]:bdsSegms[1]]), ' = ', param[11] - np.max(diams[bdsSegms[0]:bdsSegms[1]]))
+class DataAlgorithms(object):
+    def __init__(self, volumeMesh, segms3DLumen, bdsSegments, data_list, funcName="sin", steps=10):
+        self.cline = self.createCenterline(segms3DLumen)
+        self.funcName = funcName
+        self.offsets = self.calcOffsets(bdsSegments, data_list, self.funcName)
+        [self.displs, self.trajs] = self.createDisplacementWall(volumeMesh, segms3DLumen, bdsSegments, self.cline, self.offsets, steps)
     
-    print('VESSEL: MEAN LUMEN DIAMETER: ',      param[4], ' - ', np.mean(diams), ' = ', param[4] - np.mean(diams))
-    print('IN-SEG: MINIMUM LUMEN DIAMETER: ',   param[6], ' - ', np.min(diams[bdsSegms[0]:bdsSegms[1]]), ' = ', param[6] - np.min(diams[bdsSegms[0]:bdsSegms[1]]))
-    print('VESSEL: MINIMUM LUMEN DIAMETER: ',   param[12], ' - ', np.min(diams), ' = ', param[12] - np.min(diams))
+    def createCenterline(self, segms: list) -> list:
+        centerline = []
+        for pts in segms:
+            newPt = [0., 0., 0.]
+            for pt in pts:
+                newPt = np.add.reduce([newPt, pt])
+            newPt = np.divide(newPt, len(pts))
+            centerline.append(newPt)  
+        return centerline  
 
-    pr_stenosis = (1 - np.min(diams)/np.mean(diams))*100
-    print('STENT: DIAMETER STENOSIS (%): ', param[1], ' - ', pr_stenosis,  ' = ', param[1] - pr_stenosis) 
+    def calcOffsets(self, bdsSegments: list, data_list: list, functionName: str) -> list:
+        """
+        The function calculates scalar offsets for each segment using a given function.
+        """
+        offsets = []
+        N = bdsSegments[3] - bdsSegments[2]
+        for i in range(0, N):
+            offsets.append(self.funcOffset(i, bdsSegments, data_list, functionName))    
+        return offsets
+    
+    def funcOffset(self, k, bdsSegments: list, data_list: list, functionName: str) -> float:
+        match functionName:
+            case "sin":
+                # f(k) = (delta_min_diam/2)*sin(pi*k/N_s)
+                return (np.abs(data_list[5] - data_list[6]) *
+                        (np.sin(np.pi * k / (bdsSegments[3] - bdsSegments[2]))))
+            case "s-curve":
+                print("Warring: \'s-curve\' has not been implemented yet!")
+                return 0
+            case _:
+                print("Warring: \'" + functionName + "\' not found, check \'init.ini\'!")
+                sys.exit()
+
+    def createDisplacementWall(self, volumeMesh, segms3DLumen, bdsSegments, cline, offsets, steps=10):
+        cellArray= vtkCellArray()
+        cellArray.DeepCopy(volumeMesh.GetCells())
+        pts = vtkPoints()
+        pts.DeepCopy(volumeMesh.GetPoints())
+
+        listPts = [] #idx pts for preparation
+
+        segm_init = segms3DLumen[bdsSegments[2]]
+        segm_init_normal = getFaceNormal(segm_init)
+        segm_fin = segms3DLumen[bdsSegments[3]]
+        segm_fin_normal = getFaceNormal(segm_fin)
+            
+        for i in range(0, pts.GetNumberOfPoints()):
+            flg = True
+            pt = pts.GetPoint(i)
+
+            p2f_init = np.diff([pt, segm_init[0]], axis=0)[0]
+            d_init = np.dot(p2f_init, segm_init_normal)
+            flg *= d_init < 0
+                    
+            p2f_fin = np.diff([pt, segm_fin[0]], axis=0)[0]
+            d_fin = np.dot(p2f_fin, segm_fin_normal)
+            flg *= d_fin > 0
+
+            if flg:
+                listPts.append(i)
+
+        offset2vec = []
+        for i in listPts:
+            pt = pts.GetPoint(i)
+            listdist = []
+            for j in range(bdsSegments[2], bdsSegments[3]):
+                listdist.append(getDistance(pt, cline[j]))
+            minIdx = np.argmin(listdist)
+            
+            norm_vec = normalize(np.diff([pt, cline[int(minIdx + bdsSegments[2])]], axis=0)[0])
+            offset2vec.append(np.multiply(norm_vec, offsets[minIdx]))
+
+        visTraj = []
+        for j in range(0, steps):
+            tempPts = vtkPoints()
+            tempPts.DeepCopy(pts)
+            for i in range(0, len(listPts)):
+                pt = tempPts.GetPoint(listPts[i])
+                tempPts.SetPoint(listPts[i], np.add.reduce([pt, np.multiply(offset2vec[i], j/10)]))
+            newPD = vtkPolyData()
+            newPD.SetPoints(tempPts)
+            newPD.SetPolys(cellArray)
+            visTraj.append(newPD)
+
+        allOffsets = [[0.0]*3] * pts.GetNumberOfPoints()
+        for i in range(0, len(listPts)):
+            allOffsets[listPts[i]] = offset2vec[i]
+
+        return [allOffsets, visTraj]
+            
+    def analysisOfVessel(self, vessel, cline, bdsSegms, data_list):
+        '''
+        Calculates max, min, mean, % of stenosis.
+        - vessel: lumen surface, polydata from stl
+        - cline: centerLine from createCenterline(...), ordered array of points
+        - bdsSegms: segment numbers [initVessel, finVessel, initStent, finStent]
+        '''   
+        diams = []
+        for i in range(0, len(cline) - 1):
+            plane = vtkPlane()
+            plane.SetOrigin(cline[i])
+            plane.SetNormal(normalize(np.diff([cline[i+1], cline[i]], axis=0)[0]))
+
+            cutter = vtkCutter()
+            cutter.SetInputData(vessel)
+            cutter.SetCutFunction(plane)
+            cutter.Update()
+
+            pts = cutter.GetOutput().GetPoints()
+            npts = pts.GetNumberOfPoints()
+
+            sum_chord = 0.
+            # можно сделать оптимальнее? сократить количество итераций в 2 раза
+            for j in range(0, npts):
+                max_chord = 0.
+                for k in range(0, npts):
+                    d_jk = getDistance(pts.GetPoint(j), pts.GetPoint(k))
+                    if (d_jk > max_chord):
+                        max_chord = d_jk
+                sum_chord += max_chord
+            diams.append(sum_chord/npts)
+
+        print('VESSEL: MAXIMUM LUMEN DIAMETER: ',   data_list[7], ' - ', np.max(diams), ' = ' ,data_list[7] - np.max(diams))
+        print('DIST: MAXIMUM LUMEN DIAMETER: ',     data_list[8], ' - ', np.max(diams[0:bdsSegms[0]]), ' = ', data_list[8] - np.max(diams[0:bdsSegms[0]]))
+        print('PROX: MAXIMUM LUMEN DIAMETER: ',     data_list[9], ' - ', np.max(diams[bdsSegms[1]:(len(cline) - 1)]), ' = ', data_list[9] - np.max(diams[bdsSegms[1]:(len(cline) - 1)]))
+        print('STENT: MAXIMUM LUMEN DIAMETER: ',    data_list[10], ' - ', np.max(diams[bdsSegms[2]:bdsSegms[3]]), ' = ', data_list[10] - np.max(diams[bdsSegms[2]:bdsSegms[3]]))
+        print('IN-SEG: MAXIMUM LUMEN DIAMETER: ',   data_list[11], ' - ', np.max(diams[bdsSegms[0]:bdsSegms[1]]), ' = ', data_list[11] - np.max(diams[bdsSegms[0]:bdsSegms[1]]))
+        
+        print('VESSEL: MEAN LUMEN DIAMETER: ',      data_list[4], ' - ', np.mean(diams), ' = ', data_list[4] - np.mean(diams))
+        print('IN-SEG: MINIMUM LUMEN DIAMETER: ',   data_list[6], ' - ', np.min(diams[bdsSegms[0]:bdsSegms[1]]), ' = ', data_list[6] - np.min(diams[bdsSegms[0]:bdsSegms[1]]))
+        print('VESSEL: MINIMUM LUMEN DIAMETER: ',   data_list[12], ' - ', np.min(diams), ' = ', data_list[12] - np.min(diams))
+
+        pr_stenosis = (1 - np.min(diams)/np.mean(diams))*100
+        print('STENT: DIAMETER STENOSIS (%): ', data_list[1], ' - ', pr_stenosis,  ' = ', data_list[1] - pr_stenosis) 
