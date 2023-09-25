@@ -158,15 +158,15 @@ class DataAlgorithms(object):
                 sum_chord += max_chord
             diams.append(sum_chord/npts)
 
-        print('VESSEL: MAXIMUM LUMEN DIAMETER: ',   data_list[7], ' - ', np.max(diams), ' = ' ,data_list[7] - np.max(diams))
-        print('DIST: MAXIMUM LUMEN DIAMETER: ',     data_list[8], ' - ', np.max(diams[0:bdsSegms[0]]), ' = ', data_list[8] - np.max(diams[0:bdsSegms[0]]))
-        print('PROX: MAXIMUM LUMEN DIAMETER: ',     data_list[9], ' - ', np.max(diams[bdsSegms[1]:(len(cline) - 1)]), ' = ', data_list[9] - np.max(diams[bdsSegms[1]:(len(cline) - 1)]))
-        print('STENT: MAXIMUM LUMEN DIAMETER: ',    data_list[10], ' - ', np.max(diams[bdsSegms[2]:bdsSegms[3]]), ' = ', data_list[10] - np.max(diams[bdsSegms[2]:bdsSegms[3]]))
-        print('IN-SEG: MAXIMUM LUMEN DIAMETER: ',   data_list[11], ' - ', np.max(diams[bdsSegms[0]:bdsSegms[1]]), ' = ', data_list[11] - np.max(diams[bdsSegms[0]:bdsSegms[1]]))
+        print('VESSEL: MAXIMUM LUMEN DIAMETER: ',   data_list[9], ' - ', np.max(diams), ' = ' ,data_list[9] - np.max(diams))
+        print('DIST: MAXIMUM LUMEN DIAMETER: ',     data_list[10], ' - ', np.max(diams[0:bdsSegms[0]]), ' = ', data_list[10] - np.max(diams[0:bdsSegms[0]]))
+        print('PROX: MAXIMUM LUMEN DIAMETER: ',     data_list[11], ' - ', np.max(diams[bdsSegms[1]:(len(cline) - 1)]), ' = ', data_list[11] - np.max(diams[bdsSegms[1]:(len(cline) - 1)]))
+        print('STENT: MAXIMUM LUMEN DIAMETER: ',    data_list[12], ' - ', np.max(diams[bdsSegms[2]:bdsSegms[3]]), ' = ', data_list[12] - np.max(diams[bdsSegms[2]:bdsSegms[3]]))
+        print('IN-SEG: MAXIMUM LUMEN DIAMETER: ',   data_list[13], ' - ', np.max(diams[bdsSegms[0]:bdsSegms[1]]), ' = ', data_list[13] - np.max(diams[bdsSegms[0]:bdsSegms[1]]))
         
         print('VESSEL: MEAN LUMEN DIAMETER: ',      data_list[4], ' - ', np.mean(diams), ' = ', data_list[4] - np.mean(diams))
         print('IN-SEG: MINIMUM LUMEN DIAMETER: ',   data_list[6], ' - ', np.min(diams[bdsSegms[0]:bdsSegms[1]]), ' = ', data_list[6] - np.min(diams[bdsSegms[0]:bdsSegms[1]]))
-        print('VESSEL: MINIMUM LUMEN DIAMETER: ',   data_list[12], ' - ', np.min(diams), ' = ', data_list[12] - np.min(diams))
+        print('VESSEL: MINIMUM LUMEN DIAMETER: ',   data_list[7], ' - ', np.min(diams), ' = ', data_list[7] - np.min(diams))
 
         pr_stenosis = (1 - np.min(diams)/np.mean(diams))*100
         print('STENT: DIAMETER STENOSIS (%): ', data_list[1], ' - ', pr_stenosis,  ' = ', data_list[1] - pr_stenosis) 
