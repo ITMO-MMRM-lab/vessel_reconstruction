@@ -14,10 +14,14 @@ from vtkmodules.all import (
     vtkXMLPolyDataReader,
     vtkXMLPolyDataWriter,
     vtkXMLUnstructuredGridReader)
-
-from reader import Reader
+import numpy as np
+from core import getDistance
 
 def getNodeIdOnTheBorder(polydata):
+    """
+    Returns a list of indexes of points lying on the instream and outstream curves.\n
+    - polydata - vtkPolyData object, vessel lumen.
+    """
     node2cell = OrderedDict()
     for i in range(polydata.GetNumberOfCells()):
         for j in range(3):
@@ -33,15 +37,19 @@ def getNodeIdOnTheBorder(polydata):
             nodeId.append(key)
     return nodeId
 
-# sort nodes on border to create cells
 def sort(polydata, ptsId):
+    """
+    Sort nodes on border to create cells.\n
+    Returns an ordered list of indexes.\n
+    - polydata - vtkPolyData object, vessel lumen,
+    - ptsId - idxs points on border.
+    """
     listLen = list()
     listLen.append(0.0)
     pt0 = polydata.GetPoint(ptsId[0])
     for i in range(1, len(ptsId)):
         pt1 = polydata.GetPoint(ptsId[i])
-        listLen.append(abs((pt0[0] - pt1[0]) * (pt0[0] - pt1[0]) + (pt0[1] - pt1[1]) * (pt0[1] - pt1[1]) + (
-                pt0[2] - pt1[2]) * (pt0[2] - pt1[2])))
+        listLen.append(getDistance(pt0, pt1))
 
     newlistId = ptsId
     sort_flg = False
@@ -62,7 +70,7 @@ def sort(polydata, ptsId):
     for i in range(2, len(ptsId)):
         pt2 = polydata.GetPoint(newlistId[i])
         v02 = [pt2[0] - pt0[0], pt2[1] - pt0[1], pt2[2] - pt0[2]]
-        listAngle.append(abs(acos(sc_prod(v02, v01) / sqrt(sc_prod(v01, v01) * sc_prod(v02, v02)))))
+        listAngle.append(abs(acos(np.dot(v02, v01) / sqrt(np.dot(v01, v01) * np.dot(v02, v02)))))
 
     sort_flg = False
     while (not sort_flg):
@@ -75,6 +83,13 @@ def sort(polydata, ptsId):
     return newlistId
 
 def closeSurface(polyLumen, polyWall):
+    """
+    Returns the volumetric closed surface of the vessel.\n
+    (Since the size of lumen and wall do not match, the outer surface 
+    is created according to the average thickness of the vessel)
+    - polyLumen - vtkPolyData, lumen vessel
+    - polyWall - vtkPolyData, wall vessel 
+    """
     appendFilter = vtkAppendPolyData()
     appendFilter.AddInputData(polyLumen)
     appendFilter.AddInputData(polyWall)
@@ -94,8 +109,8 @@ def closeSurface(polyLumen, polyWall):
         dists1 = list()
         dists2 = list()
         for j in range(len(idsL1)):
-            dists1.append(dist(polydata.GetPoint(idsW1[i]), polydata.GetPoint(idsL1[j])))
-            dists2.append(dist(polydata.GetPoint(idsW2[i]), polydata.GetPoint(idsL2[j])))
+            dists1.append(getDistance(polydata.GetPoint(idsW1[i]), polydata.GetPoint(idsL1[j])))
+            dists2.append(getDistance(polydata.GetPoint(idsW2[i]), polydata.GetPoint(idsL2[j])))
         idx1 = 0
         idx2 = 0
         for j in range(1, len(dists1)):
@@ -151,11 +166,12 @@ def closeSurface(polyLumen, polyWall):
 
     return polydata
 
-def sc_prod(a, b):
-    return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
-
 def calcCenterLine(polydata, path):
-    # writing polydata in *.vtp for VMTK scripts
+    """
+    Writing polydata in *.vtp for VMTK scripts.\n
+    - polydata - vtkPolyData, lumen vessel,
+    - path - output path
+    """
     writer = vtkXMLPolyDataWriter()
     writer.SetFileName(path + 'lumen.vtp')
     writer.SetInputData(polydata)
@@ -165,24 +181,33 @@ def calcCenterLine(polydata, path):
     pypes.PypeRun(myArguments)
 
 def readCenterLineVTP(path):
+    """
+    Read 'centerline.vtp' from path.
+    """
     reader = vtkXMLPolyDataReader()
     reader.SetFileName(path + 'centerline.vtp')
     reader.Update()
     return reader.GetOutput()
 
 def generateWall(polyLumen, polyWall, centerLine):
+    """
+    Returns the outer surface of the vessel, plotted by the average radius.\n
+    - polyLumen - vtkPolyData, lumen vessel,
+    - polyWall - vtkPolyData, wall vessel,
+    - centerLine - vtkPolyData, centerline.
+    """
     tempWall = vtkPolyData()
     tempWall.DeepCopy(polyLumen)
-    scale = getAverageRadus(polyWall, centerLine) / getAverageRadus(polyLumen, centerLine)
+    scale = getAverageRadius(polyWall, centerLine) / getAverageRadius(polyLumen, centerLine)
     nPtsW = tempWall.GetNumberOfPoints()
     nPtsCL = centerLine.GetNumberOfPoints()
 
     for i in range(nPtsW):
         pt0 = tempWall.GetPoint(i)
         pt1 = centerLine.GetPoint(0)
-        rad = dist(pt0, pt1)
+        rad = getDistance(pt0, pt1)
         for j in range(1, nPtsCL):
-            newRad = dist(pt0, centerLine.GetPoint(j))
+            newRad = getDistance(pt0, centerLine.GetPoint(j))
             if (newRad < rad):
                 rad = newRad
                 pt1 = centerLine.GetPoint(j)
@@ -212,12 +237,12 @@ def generateWall(polyLumen, polyWall, centerLine):
     clean.Update()
     return clean.GetOutput()
 
-def dist(pt0, pt1):
-    return abs(sqrt(
-        (pt0[0] - pt1[0]) * (pt0[0] - pt1[0]) + (pt0[1] - pt1[1]) * (pt0[1] - pt1[1]) + (pt0[2] - pt1[2]) * (
-                    pt0[2] - pt1[2])))
-
-def getAverageRadus(polydata, centerLine):
+def getAverageRadius(polydata, centerLine):
+    """
+    Returns the average distance between the surface and the line.\n
+    - polydata - vtkPolyData, surface
+    - centerLine - vtkPolyData, line
+    """
     nPtsPD = polydata.GetNumberOfPoints()
     nPtsCL = centerLine.GetNumberOfPoints()
     radiuses = list()
@@ -227,12 +252,15 @@ def getAverageRadus(polydata, centerLine):
         dists = list()
         for j in range(nPtsCL):
             pt1 = centerLine.GetPoint(j)
-            dists.append(dist(pt0, pt1))
+            dists.append(getDistance(pt0, pt1))
         radiuses.append(min(dists))
         dists.clear()
     return sum(radiuses) / len(radiuses)
 
 def vtu2csv(filename, outpath):
+    """
+    Convert *.vtu to *.csv file.
+    """
     reader = vtkXMLUnstructuredGridReader()
     reader.SetFileName(outpath + filename)
     reader.Update()
@@ -253,24 +281,27 @@ def vtu2csv(filename, outpath):
             idx += 1
     elemsfile.close()
 
-def runMesher(reader: Reader):
-    print("Mesher: Center line VMTK calculation...")
-    calcCenterLine(reader.lumenStl, reader.outpath)
-    centerLine = readCenterLineVTP(reader.outpath)
+def runMesher(lumenStl, wallStl, outpath):
+    """
+    Generate a volume mesh.
+    """
+    print("\nMesher: Center line VMTK calculation...")
+    calcCenterLine(lumenStl, outpath)
+    centerLine = readCenterLineVTP(outpath)
 
     print("Mesher: Vessel generation...")
-    newWall = generateWall(reader.lumenStl, reader.wallStl, centerLine)
-    vesselPolyData = closeSurface(reader.lumenStl, newWall)
+    newWall = generateWall(lumenStl, wallStl, centerLine)
+    vesselPolyData = closeSurface(lumenStl, newWall)
 
     writerVTP = vtkSTLWriter()
-    writerVTP.SetFileName(reader.outpath + 'vessel.stl')
+    writerVTP.SetFileName(outpath + 'vessel.stl')
     writerVTP.SetInputData(vesselPolyData)
     writerVTP.Write()
 
     # Triangulate:
     print("Mesher: Volume mesh generation....")
     mesh = pygalmesh.generate_volume_mesh_from_surface_mesh(
-        reader.outpath + 'vessel.stl',
+        outpath + 'vessel.stl',
         lloyd=True,
         min_facet_angle=25.0,
         max_radius_surface_delaunay_ball=1.5,
@@ -280,7 +311,7 @@ def runMesher(reader: Reader):
     )
 
     print("Mesher: Writing results to a file.")
-    mesh.write(reader.outpath + "volumeMesh.vtu", 'vtu')
-    vtu2csv("volumeMesh.vtu", reader.outpath)
+    mesh.write(outpath + "volumeMesh.vtu", 'vtu')
+    vtu2csv("volumeMesh.vtu", outpath)
 
     print("Mesher:done!")
