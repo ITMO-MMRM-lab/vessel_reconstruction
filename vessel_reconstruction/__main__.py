@@ -2,7 +2,7 @@
 from reader import Reader
 from core import DataAlgorithms
 from mesher import runMesher
-from writer import writeDisplacementsCSV, writePolyDataAsSTL
+from writer import writeDisplacementsCSV, writePolyDataAsSTL, printComparisonMeasurements
 import os
 
 
@@ -15,7 +15,9 @@ def main():
 
     reader.readUnstructuredGrid(reader.outpath + 'volumeMesh.vtu')
 
-    dataAlg = DataAlgorithms(reader.volumeMesh, reader.segms3DLumen, reader.bdsSegments, reader.data_list, reader.funcOffset)
+    dataAlg = DataAlgorithms(reader.volumeMesh, reader.lumenStl, reader.segms3DLumen, reader.bdsSegments, reader.data_list, reader.funcOffset)
+
+    printComparisonMeasurements(reader.data_list, dataAlg.cur_diams)
 
     writeDisplacementsCSV('data/output/vessel_disp.csv', reader.volumeMesh.GetPoints(), dataAlg.displs, 10)
 

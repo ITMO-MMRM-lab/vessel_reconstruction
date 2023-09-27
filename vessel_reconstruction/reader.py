@@ -21,13 +21,14 @@ class Reader(object):
             'VESSEL: MEAN LUMEN DIAMETER POST (mm)',            #4
             'OBSTRUCTION: MINIMUM LUMEN DIAMETER PRE (mm)',     #5
             'IN-SEGMENT: MINIMUM LUMEN DIAMETER POST (mm)',     #6
-            'VESSEL: MAXIMUM LUMEN DIAMETER POST (mm)',         #7
-            'DIST: MAXIMUM LUMEN DIAMETER POST (mm)',           #8
-            'PROX: MAXIMUM LUMEN DIAMETER POST (mm)',           #9
-            'STENT: MAXIMUM LUMEN DIAMETER POST (mm)',          #10
-            'IN-SEGMENT: MAXIMUM LUMEN DIAMETER POST (mm)',     #11
-            'VESSEL: MINIMUM LUMEN DIAMETER POST (mm)'          #12
-            ] #TODO: add MAX_LUM_DIAM
+            'VESSEL: MINIMUM LUMEN DIAMETER POST (mm)',         #7
+            'VESSEL: MAXIMUM LUMEN DIAMETER PRE (mm)',          #8
+            'VESSEL: MAXIMUM LUMEN DIAMETER POST (mm)',         #9
+            'DIST: MAXIMUM LUMEN DIAMETER POST (mm)',           #10
+            'PROX: MAXIMUM LUMEN DIAMETER POST (mm)',           #11
+            'STENT: MAXIMUM LUMEN DIAMETER POST (mm)',          #12
+            'IN-SEGMENT: MAXIMUM LUMEN DIAMETER POST (mm)'      #13
+            ]
         
         # parameter values
         self.data_list = []
@@ -110,7 +111,7 @@ class Reader(object):
         self.segms3DLumen = part1 + part2 + part3
         
         if self.isPrint:
-            print('New number of lumen contours: ', len(self.segms3DLumen))
+            print('New number of lumen contours: ', len(self.segms3DLumen),'\n')
     
     def readXLSX(self):
         """

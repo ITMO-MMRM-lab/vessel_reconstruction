@@ -56,4 +56,12 @@ def writeDisplacementsCSV(filename, points: vtkPoints, offsets: list, steps=10):
                 file.write(str(j+1) + '\t' + str(diff[0]) + '\t' +  str(diff[1]) + '\t' +  str(diff[2]) + '\t')
             file.write('\n')
         
+def printComparisonMeasurements(data_list, cur_diams):
+    print('VESSEL: Δ MAXIMUM LUMEN DIAMETER: | ', '%0.2f' % data_list[8], ' -  ', '%0.2f' % np.max(cur_diams), '| = ' , '%0.2f' % abs(data_list[8] - np.max(cur_diams)))
+    print('VESSEL: Δ MEAN LUMEN DIAMETER:    | ', '%0.2f' % data_list[3], ' -  ', '%0.2f' % np.mean(cur_diams), '| = ', '%0.2f' % abs(data_list[3] - np.mean(cur_diams)))
+    print('VESSEL: Δ MINIMUM LUMEN DIAMETER: | ', '%0.2f' % data_list[5], ' -  ', '%0.2f' % np.min(cur_diams), '| = ',  '%0.2f' % abs(data_list[5] - np.min(cur_diams)))
 
+    # https://www.nejm.org/doi/10.1056/NEJM199108153250701
+    # https://radcalculators.org/carotid-artery-stenosis-nascet-and-ecst-calculator/
+    pr_stenosis = (1 - np.min(cur_diams)/np.mean(cur_diams))*100
+    print('STENT:  Δ DIAMETER STENOSIS (%):  |', '%0.2f' % data_list[0], ' - ', '%0.2f' % pr_stenosis,  '| = ', '%0.2f' % abs(data_list[0] - pr_stenosis))

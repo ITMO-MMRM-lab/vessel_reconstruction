@@ -6,7 +6,7 @@ from vtkmodules.all import (
     vtkPolyData,
     vtkPlane,
     vtkCutter)
-from writer import writeDisplacementsCSV,writePolyDataAsSTL
+from scipy.interpolate import lagrange
 
 #-------------------------------------#
 #some operations on vectors
@@ -30,11 +30,13 @@ def normalize(pt: list) -> list:
 #preparation the data
 
 class DataAlgorithms(object):
-    def __init__(self, volumeMesh, segms3DLumen, bdsSegments, data_list, funcName="sin", steps=10):
+    def __init__(self, volumeMesh, lumenStl, segms3DLumen, bdsSegments, data_list, funcName="sin", steps=10):
         self.cline = self.createCenterline(segms3DLumen)
         self.funcName = funcName
         self.offsets = self.calcOffsets(bdsSegments, data_list, self.funcName)
         [self.displs, self.trajs] = self.createDisplacementWall(volumeMesh, segms3DLumen, bdsSegments, self.cline, self.offsets, steps)
+        self.prelumen = self.createPreLumen(lumenStl, segms3DLumen, bdsSegments, self.cline, self.offsets)
+        self.cur_diams = self.getDiameters(self.prelumen, self.cline, bdsSegments, data_list)
     
     def createCenterline(self, segms: list) -> list:
         centerline = []
@@ -57,14 +59,29 @@ class DataAlgorithms(object):
         return offsets
     
     def funcOffset(self, k, bdsSegments: list, data_list: list, functionName: str) -> float:
+        N_s = bdsSegments[3] - bdsSegments[2]
+        deltaMinR = np.abs(data_list[5] - data_list[6])/2.
         match functionName:
             case "sin":
-                # f(k) = (delta_min_diam/2)*sin(pi*k/N_s)
-                return (np.abs(data_list[5] - data_list[6]) *
-                        (np.sin(np.pi * k / (bdsSegments[3] - bdsSegments[2]))))
-            case "s-curve":
-                print("Warring: \'s-curve\' has not been implemented yet!")
-                return 0
+                # f(k) = R * sin(pi * k / N_s)
+                return deltaMinR* (np.sin(np.pi * k / (N_s)))
+            
+            case "arctan":
+                # f(k) = ± (R / 2) * (2 * arctan(k-n1) / pi) ± 1)
+                n1 = N_s / 6.
+                n2 = 5. * n1
+                if (k <= N_s / 2.):
+                    return  (deltaMinR / 2.) * ((np.arctan(k - n1) / (np.pi / 2.)) + 1)
+                else:
+                    return -(deltaMinR / 2.) * ((np.arctan(k - n2) / (np.pi / 2.)) - 1)
+
+            case "polynomial":
+                if not hasattr(self, 'poly_coef'):
+                    x = [0., N_s/2., N_s]
+                    y = [0., deltaMinR, 0.]
+                    self.poly_coef = lagrange(x, y).coef
+                return  self.poly_coef[0]*k*k + self.poly_coef[1]*k + self.poly_coef[2]
+            
             case _:
                 print("Warring: \'" + functionName + "\' not found, check \'init.ini\'!")
                 sys.exit()
@@ -125,11 +142,61 @@ class DataAlgorithms(object):
             allOffsets[listPts[i]] = offset2vec[i]
 
         return [allOffsets, visTraj]
+    
+    def createPreLumen(self, lumenStl, segms3DLumen, bdsSegments, cline, offsets):
+        cellArray= vtkCellArray()
+        cellArray.DeepCopy(lumenStl.GetPolys())
+        pts = vtkPoints()
+        pts.DeepCopy(lumenStl.GetPoints())
+
+        listPts = [] #idx pts for preparation
+
+        segm_init = segms3DLumen[bdsSegments[2]]
+        segm_init_normal = getFaceNormal(segm_init)
+        segm_fin = segms3DLumen[bdsSegments[3]]
+        segm_fin_normal = getFaceNormal(segm_fin)
             
-    def analysisOfVessel(self, vessel, cline, bdsSegms, data_list):
+        for i in range(0, pts.GetNumberOfPoints()):
+            flg = True
+            pt = pts.GetPoint(i)
+
+            p2f_init = np.diff([pt, segm_init[0]], axis=0)[0]
+            d_init = np.dot(p2f_init, segm_init_normal)
+            flg *= d_init < 0
+                    
+            p2f_fin = np.diff([pt, segm_fin[0]], axis=0)[0]
+            d_fin = np.dot(p2f_fin, segm_fin_normal)
+            flg *= d_fin > 0
+
+            if flg:
+                listPts.append(i)
+
+        offset2vec = []
+        for i in listPts:
+            pt = pts.GetPoint(i)
+            listdist = []
+            for j in range(bdsSegments[2], bdsSegments[3]):
+                listdist.append(getDistance(pt, cline[j]))
+            minIdx = np.argmin(listdist)
+            
+            norm_vec = normalize(np.diff([pt, cline[int(minIdx + bdsSegments[2])]], axis=0)[0])
+            offset2vec.append(np.multiply(norm_vec, offsets[minIdx]))
+
+        newPts = vtkPoints()
+        newPts.DeepCopy(pts)
+        for i in range(0, len(listPts)):
+            pt = newPts.GetPoint(listPts[i])
+            newPts.SetPoint(listPts[i], np.add.reduce([pt, offset2vec[i]]))
+
+        newLumen = vtkPolyData()
+        newLumen.SetPoints(newPts)
+        newLumen.SetPolys(cellArray)
+        return newLumen
+
+    def getDiameters(self, prelumen, cline, bdsSegms, data_list):
         '''
-        Calculates max, min, mean, % of stenosis.
-        - vessel: lumen surface, polydata from stl
+        The function returns the diameters of the vessel.
+        - prelumen: lumen surface, genetared polydata 
         - cline: centerLine from createCenterline(...), ordered array of points
         - bdsSegms: segment numbers [initVessel, finVessel, initStent, finStent]
         '''   
@@ -140,33 +207,15 @@ class DataAlgorithms(object):
             plane.SetNormal(normalize(np.diff([cline[i+1], cline[i]], axis=0)[0]))
 
             cutter = vtkCutter()
-            cutter.SetInputData(vessel)
+            cutter.SetInputData(prelumen)
             cutter.SetCutFunction(plane)
             cutter.Update()
 
             pts = cutter.GetOutput().GetPoints()
             npts = pts.GetNumberOfPoints()
 
-            sum_chord = 0.
-            # можно сделать оптимальнее? сократить количество итераций в 2 раза
+            sumRad = 0
             for j in range(0, npts):
-                max_chord = 0.
-                for k in range(0, npts):
-                    d_jk = getDistance(pts.GetPoint(j), pts.GetPoint(k))
-                    if (d_jk > max_chord):
-                        max_chord = d_jk
-                sum_chord += max_chord
-            diams.append(sum_chord/npts)
-
-        print('VESSEL: MAXIMUM LUMEN DIAMETER: ',   data_list[7], ' - ', np.max(diams), ' = ' ,data_list[7] - np.max(diams))
-        print('DIST: MAXIMUM LUMEN DIAMETER: ',     data_list[8], ' - ', np.max(diams[0:bdsSegms[0]]), ' = ', data_list[8] - np.max(diams[0:bdsSegms[0]]))
-        print('PROX: MAXIMUM LUMEN DIAMETER: ',     data_list[9], ' - ', np.max(diams[bdsSegms[1]:(len(cline) - 1)]), ' = ', data_list[9] - np.max(diams[bdsSegms[1]:(len(cline) - 1)]))
-        print('STENT: MAXIMUM LUMEN DIAMETER: ',    data_list[10], ' - ', np.max(diams[bdsSegms[2]:bdsSegms[3]]), ' = ', data_list[10] - np.max(diams[bdsSegms[2]:bdsSegms[3]]))
-        print('IN-SEG: MAXIMUM LUMEN DIAMETER: ',   data_list[11], ' - ', np.max(diams[bdsSegms[0]:bdsSegms[1]]), ' = ', data_list[11] - np.max(diams[bdsSegms[0]:bdsSegms[1]]))
-        
-        print('VESSEL: MEAN LUMEN DIAMETER: ',      data_list[4], ' - ', np.mean(diams), ' = ', data_list[4] - np.mean(diams))
-        print('IN-SEG: MINIMUM LUMEN DIAMETER: ',   data_list[6], ' - ', np.min(diams[bdsSegms[0]:bdsSegms[1]]), ' = ', data_list[6] - np.min(diams[bdsSegms[0]:bdsSegms[1]]))
-        print('VESSEL: MINIMUM LUMEN DIAMETER: ',   data_list[12], ' - ', np.min(diams), ' = ', data_list[12] - np.min(diams))
-
-        pr_stenosis = (1 - np.min(diams)/np.mean(diams))*100
-        print('STENT: DIAMETER STENOSIS (%): ', data_list[1], ' - ', pr_stenosis,  ' = ', data_list[1] - pr_stenosis) 
+                sumRad += getDistance(cline[i], pts.GetPoint(j))
+            diams.append(sumRad*2./npts)
+        return diams

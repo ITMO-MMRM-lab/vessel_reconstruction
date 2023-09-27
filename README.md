@@ -23,10 +23,11 @@ $ conda activate <name_env>
 $ python vessel_reconstruction/__main__.py
 ```
 ## [Requirements](requirements.txt)
-- numpy=1.25.2
-- pandas=2.1.0
-- pygalmesh=0.10.7
-- python=3.10.12
-- vmtk=1.5.0
-- vtk=9.1.0
-- openpyxl=3.1.2
+- [numpy](https://numpy.org/)=1.25.2
+- [pandas](https://pandas.pydata.org/)=2.1.0
+- [pygalmesh](https://github.com/meshpro/pygalmesh)=0.10.7
+- [python](https://www.python.org/)=3.10.12
+- [scipy](https://scipy.org/)=1.11.2
+- [vmtk](http://www.vmtk.org/)=1.5.0
+- [vtk](https://vtk.org/)=9.1.0
+- [openpyxl](https://openpyxl.readthedocs.io/en/stable/)=3.1.2
