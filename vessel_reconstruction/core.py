@@ -6,7 +6,7 @@ from vtkmodules.all import (
     vtkPolyData,
     vtkPlane,
     vtkCutter)
-from writer import writeDisplacementsCSV,writePolyDataAsSTL
+
 
 #-------------------------------------#
 #some operations on vectors
@@ -36,6 +36,7 @@ class DataAlgorithms(object):
         self.offsets = self.calcOffsets(bdsSegments, data_list, self.funcName)
         [self.displs, self.trajs] = self.createDisplacementWall(volumeMesh, segms3DLumen, bdsSegments, self.cline, self.offsets, steps)
         self.prelumen = self.createPreLumen(lumenStl, segms3DLumen, bdsSegments, self.cline, self.offsets)
+        self.cur_diams = self.getDiameters(self.prelumen, self.cline, bdsSegments, data_list)
     
     def createCenterline(self, segms: list) -> list:
         centerline = []
@@ -177,9 +178,9 @@ class DataAlgorithms(object):
         newLumen.SetPolys(cellArray)
         return newLumen
 
-    def analysisOfVessel(self, prelumen, cline, bdsSegms, data_list):
+    def getDiameters(self, prelumen, cline, bdsSegms, data_list):
         '''
-        Calculates max, min, mean, % of stenosis.
+        The function returns the diameters of the vessel.
         - prelumen: lumen surface, genetared polydata 
         - cline: centerLine from createCenterline(...), ordered array of points
         - bdsSegms: segment numbers [initVessel, finVessel, initStent, finStent]
@@ -202,12 +203,4 @@ class DataAlgorithms(object):
             for j in range(0, npts):
                 sumRad += getDistance(cline[i], pts.GetPoint(j))
             diams.append(sumRad*2./npts)
-
-        print('VESSEL: MAXIMUM LUMEN DIAMETER: | ', '%0.2f' % data_list[8], ' -  ', '%0.2f' % np.max(diams), '| = ' , '%0.2f' % abs(data_list[8] - np.max(diams)))
-        print('VESSEL: MEAN LUMEN DIAMETER:    | ', '%0.2f' % data_list[3], ' -  ', '%0.2f' % np.mean(diams), '| = ', '%0.2f' % abs(data_list[3] - np.mean(diams)))
-        print('VESSEL: MINIMUM LUMEN DIAMETER: | ', '%0.2f' % data_list[5], ' -  ', '%0.2f' % np.min(diams), '| = ',  '%0.2f' % abs(data_list[5] - np.min(diams)))
-
-        # https://www.nejm.org/doi/10.1056/NEJM199108153250701
-        # https://radcalculators.org/carotid-artery-stenosis-nascet-and-ecst-calculator/
-        pr_stenosis = (1 - np.min(diams)/np.mean(diams))*100
-        print('STENT: DIAMETER STENOSIS (%):   |', '%0.2f' % data_list[0], ' - ', '%0.2f' % pr_stenosis,  '| = ', '%0.2f' % abs(data_list[0] - pr_stenosis))
+        return diams

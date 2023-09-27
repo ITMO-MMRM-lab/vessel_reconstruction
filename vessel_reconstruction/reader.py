@@ -111,7 +111,7 @@ class Reader(object):
         self.segms3DLumen = part1 + part2 + part3
         
         if self.isPrint:
-            print('New number of lumen contours: ', len(self.segms3DLumen))
+            print('New number of lumen contours: ', len(self.segms3DLumen),'\n')
     
     def readXLSX(self):
         """
