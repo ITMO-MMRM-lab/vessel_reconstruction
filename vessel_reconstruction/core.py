@@ -6,7 +6,7 @@ from vtkmodules.all import (
     vtkPolyData,
     vtkPlane,
     vtkCutter)
-
+from scipy.interpolate import lagrange
 
 #-------------------------------------#
 #some operations on vectors
@@ -59,14 +59,24 @@ class DataAlgorithms(object):
         return offsets
     
     def funcOffset(self, k, bdsSegments: list, data_list: list, functionName: str) -> float:
+        N_s = bdsSegments[3] - bdsSegments[2]
+        deltaMinR = np.abs(data_list[5] - data_list[6])/2.
         match functionName:
             case "sin":
-                # f(k) = (delta_min_diam/2)*sin(pi*k/N_s)
-                return (np.abs(data_list[5] - data_list[6]) *
-                        (np.sin(np.pi * k / (bdsSegments[3] - bdsSegments[2]))))*0.5
+                # f(k) = (delta_min_diam / 2)*sin(pi * k / N_s)
+                return deltaMinR* (np.sin(np.pi * k / (N_s)))
+            
             case "s-curve":
                 print("Warring: \'s-curve\' has not been implemented yet!")
                 return 0
+
+            case "polynomial":
+                if not hasattr(self, 'poly_coef'):
+                    x = [0., N_s/2., N_s]
+                    y = [0., deltaMinR, 0.]
+                    self.poly_coef = lagrange(x, y).coef
+                return  self.poly_coef[0]*k*k + self.poly_coef[1]*k + self.poly_coef[2]
+            
             case _:
                 print("Warring: \'" + functionName + "\' not found, check \'init.ini\'!")
                 sys.exit()

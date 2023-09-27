@@ -56,7 +56,7 @@ def writeDisplacementsCSV(filename, points: vtkPoints, offsets: list, steps=10):
                 file.write(str(j+1) + '\t' + str(diff[0]) + '\t' +  str(diff[1]) + '\t' +  str(diff[2]) + '\t')
             file.write('\n')
         
-def writeComparisonMeasurements(data_list, cur_diams):
+def printComparisonMeasurements(data_list, cur_diams):
     print('VESSEL: Δ MAXIMUM LUMEN DIAMETER: | ', '%0.2f' % data_list[8], ' -  ', '%0.2f' % np.max(cur_diams), '| = ' , '%0.2f' % abs(data_list[8] - np.max(cur_diams)))
     print('VESSEL: Δ MEAN LUMEN DIAMETER:    | ', '%0.2f' % data_list[3], ' -  ', '%0.2f' % np.mean(cur_diams), '| = ', '%0.2f' % abs(data_list[3] - np.mean(cur_diams)))
     print('VESSEL: Δ MINIMUM LUMEN DIAMETER: | ', '%0.2f' % data_list[5], ' -  ', '%0.2f' % np.min(cur_diams), '| = ',  '%0.2f' % abs(data_list[5] - np.min(cur_diams)))
