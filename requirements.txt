@@ -7,6 +7,7 @@ numpy=1.25.2=py310ha4c1d20_0
 pandas=2.1.0=py310hcc13569_0
 pygalmesh=0.10.7=py310he29668c_1
 python=3.10.12=hd12c33a_0_cpython
+scipy=1.11.2=py310hb13e2d6_1
 vmtk=1.5.0=py310h768c99c_11
 vtk=9.1.0=egl_py310h9838174_15
 openpyxl=3.1.2=py310h2372a71_0
