@@ -63,12 +63,17 @@ class DataAlgorithms(object):
         deltaMinR = np.abs(data_list[5] - data_list[6])/2.
         match functionName:
             case "sin":
-                # f(k) = (delta_min_diam / 2)*sin(pi * k / N_s)
+                # f(k) = R * sin(pi * k / N_s)
                 return deltaMinR* (np.sin(np.pi * k / (N_s)))
             
-            case "s-curve":
-                print("Warring: \'s-curve\' has not been implemented yet!")
-                return 0
+            case "arctan":
+                # f(k) = ± (R / 2) * (2 * arctan(k-n1) / pi) ± 1)
+                n1 = N_s / 6.
+                n2 = 5. * n1
+                if (k <= N_s / 2.):
+                    return  (deltaMinR / 2.) * ((np.arctan(k - n1) / (np.pi / 2.)) + 1)
+                else:
+                    return -(deltaMinR / 2.) * ((np.arctan(k - n2) / (np.pi / 2.)) - 1)
 
             case "polynomial":
                 if not hasattr(self, 'poly_coef'):
