@@ -2,7 +2,14 @@ from core import *
 import configparser
 import pandas
 import numpy as np
-from vtkmodules.all import vtkSTLReader, vtkXMLUnstructuredGridReader
+import vtk
+from vtkmodules.all import (
+    vtkSTLReader, 
+    vtkXMLUnstructuredGridReader, 
+    vtkPoints, 
+    vtkUnstructuredGrid,
+    vtkIdList)
+from progress.bar import IncrementalBar
 
 
 class Reader(object):
@@ -51,6 +58,7 @@ class Reader(object):
         # data .stl
         self.lumenStl = self.readStl('data/' + self.config["CONFIG"]["ID"] + '/' + self.config["CONFIG"]["ID"] + '-BL/LUMEN/Lumen_mesh.stl')
         self.wallStl = self.readStl('data/' + self.config["CONFIG"]["ID"] + '/' + self.config["CONFIG"]["ID"] + '-BL/VESSEL WALL/VesselWall_mesh.stl')
+        self.stent = self.readStent(self.config["CONFIG"]["PathStentNodes"], self.config["CONFIG"]["PathStentElements"])
 
     def update(self):
         """
@@ -187,3 +195,32 @@ class Reader(object):
         reader.SetFileName(filename)
         reader.Update()
         self.volumeMesh = reader.GetOutput()
+
+    def readStent(self, fileNodes, fileElements):
+        ptIds = []
+        pts = vtkPoints()
+        stent = vtkUnstructuredGrid()
+
+        with open(fileNodes) as fNodes:
+            lines = fNodes.readlines()
+            for i in range(0, len(lines)):
+                line = lines[i].split('\t')
+                ptIds.append(int(line[0]))
+                pts.InsertNextPoint([float(line[1]), float(line[2]), float(line[3])])   
+        stent.SetPoints(pts)
+
+        with open(fileElements) as fElems:
+            lines = fElems.readlines()
+            stent.Allocate(len(lines))
+            print(len(lines))
+            print(pts.GetNumberOfPoints())
+            progress_bar = IncrementalBar('Read node_elements.csv: ', max = len(lines))
+            for i in range(0, len(lines)):
+                progress_bar.next()
+                line = lines[i].split('\t')[1:]
+                idList = vtkIdList()
+                idList.SetNumberOfIds(len(line))
+                for j in range(0, len(line)):
+                    idList.InsertId(j, ptIds.index(int(line[j])))
+                stent.InsertNextCell(vtk.VTK_HEXAHEDRON, idList)
+        return stent

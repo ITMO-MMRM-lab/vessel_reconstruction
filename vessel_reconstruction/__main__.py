@@ -2,13 +2,15 @@
 from reader import Reader
 from core import DataAlgorithms
 from mesher import runMesher
-from writer import writeDisplacementsCSV, writePolyDataAsSTL, printComparisonMeasurements
+from writer import writeDisplacementsCSV, writePolyDataAsSTL, printComparisonMeasurements, writeUnstructuredGrid
 import os
 
 
 def main():
     reader = Reader(os.getcwd() + '/config/init.ini')
     reader.update()
+    writeUnstructuredGrid('stent.vtk', reader.stent)
+
   
     if not os.path.isfile(reader.outpath + 'volumeMesh.vtu'):
         runMesher(reader.lumenStl, reader.wallStl, reader.outpath)
