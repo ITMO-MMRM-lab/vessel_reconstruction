@@ -9,7 +9,8 @@ from vtkmodules.all import (
     vtkPoints, 
     vtkUnstructuredGrid,
     vtkIdList)
-from progress.bar import IncrementalBar
+from progress.bar import FillingCirclesBar
+import os
 
 
 class Reader(object):
@@ -58,7 +59,6 @@ class Reader(object):
         # data .stl
         self.lumenStl = self.readStl('data/' + self.config["CONFIG"]["ID"] + '/' + self.config["CONFIG"]["ID"] + '-BL/LUMEN/Lumen_mesh.stl')
         self.wallStl = self.readStl('data/' + self.config["CONFIG"]["ID"] + '/' + self.config["CONFIG"]["ID"] + '-BL/VESSEL WALL/VesselWall_mesh.stl')
-        self.stent = self.readStent(self.config["CONFIG"]["PathStentNodes"], self.config["CONFIG"]["PathStentElements"])
 
     def update(self):
         """
@@ -150,7 +150,7 @@ class Reader(object):
             self.bdsSegments[3] = int(lines[len(lines)-1].split(' ')[0])
 
         if self.isPrint:
-            print('Segment numbers:\n[initVessel, finVessel, initStent, finStent] = ',self.bdsSegments)
+            print('\nSegment numbers:\n[initVessel, finVessel, initStent, finStent] = ',self.bdsSegments)
 
     def readContours3D(self):
         """
@@ -190,37 +190,39 @@ class Reader(object):
         reader.Update()
         return reader.GetOutput()
     
+    def readVolumeMesh(self, filename):
+        self.volumeMesh = self.readUnstructuredGrid(filename)
+    
     def readUnstructuredGrid(self, filename):
         reader = vtkXMLUnstructuredGridReader()
         reader.SetFileName(filename)
         reader.Update()
-        self.volumeMesh = reader.GetOutput()
+        return reader.GetOutput()
 
-    def readStent(self, fileNodes, fileElements):
-        ptIds = []
-        pts = vtkPoints()
-        stent = vtkUnstructuredGrid()
+    def readStent(self):
+        if not os.path.isfile(self.config["CONFIG"]["PathStentVTU"]):
+            ptIds = []
+            pts = vtkPoints()
+            stent = vtkUnstructuredGrid()
 
-        with open(fileNodes) as fNodes:
-            lines = fNodes.readlines()
-            for i in range(0, len(lines)):
-                line = lines[i].split('\t')
-                ptIds.append(int(line[0]))
-                pts.InsertNextPoint([float(line[1]), float(line[2]), float(line[3])])   
-        stent.SetPoints(pts)
+            with open(self.config["CONFIG"]["PathStentNodes"]) as fNodes:
+                lines = fNodes.readlines()
+                for i in range(0, len(lines)):
+                    line = lines[i].split('\t')
+                    ptIds.append(int(line[0]))
+                    pts.InsertNextPoint([float(line[1]), float(line[2]), float(line[3])])   
+            stent.SetPoints(pts)
 
-        with open(fileElements) as fElems:
-            lines = fElems.readlines()
-            stent.Allocate(len(lines))
-            print(len(lines))
-            print(pts.GetNumberOfPoints())
-            progress_bar = IncrementalBar('Read node_elements.csv: ', max = len(lines))
-            for i in range(0, len(lines)):
-                progress_bar.next()
-                line = lines[i].split('\t')[1:]
-                idList = vtkIdList()
-                idList.SetNumberOfIds(len(line))
-                for j in range(0, len(line)):
-                    idList.InsertId(j, ptIds.index(int(line[j])))
-                stent.InsertNextCell(vtk.VTK_HEXAHEDRON, idList)
-        return stent
+            with open(self.config["CONFIG"]["PathStentElements"]) as fElems:
+                lines = fElems.readlines()
+                stent.Allocate(len(lines))
+                suffix = '%(percent)d%% [%(elapsed_td)s / %(eta_td)s]'
+                progress_bar = FillingCirclesBar('Read stent_elements.csv: ', suffix=suffix, max = len(lines))
+                for i in range(0, len(lines)):
+                    progress_bar.next()
+                    line = lines[i].split('\t')[1:]
+                    stent.InsertNextCell(vtk.VTK_HEXAHEDRON, len(line), [ptIds.index(int(idx)) for idx in line])
+            self.stent = stent
+        else:
+            self.stent = self.readUnstructuredGrid(self.config["CONFIG"]["PathStentVTU"])
+        print("\nStent reading was successful!\n")

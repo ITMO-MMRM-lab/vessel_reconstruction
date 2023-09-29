@@ -5,7 +5,9 @@ from vtkmodules.all import (
     vtkPoints,
     vtkPolyData,
     vtkPlane,
-    vtkCutter)
+    vtkCutter,
+    vtkTransform,
+    vtkTransformFilter)
 from scipy.interpolate import lagrange
 
 #-------------------------------------#
@@ -219,3 +221,30 @@ class DataAlgorithms(object):
                 sumRad += getDistance(cline[i], pts.GetPoint(j))
             diams.append(sumRad*2./npts)
         return diams
+    
+    def tranformStent(self, stent, bdsSegments):
+        transform = vtkTransform()
+        midleSegm = int((bdsSegments[2] + bdsSegments[3]) / 2.)
+        ptSegm = self.cline[midleSegm]
+
+        v1 = np.diff([self.cline[midleSegm+10], self.cline[midleSegm-10]], axis=0)[0]
+        v2 = [0., 0., 1.]
+        axe = normalize(np.cross(v1, v2))
+
+        v1_u = v1 / np.linalg.norm(v1)
+        v2_u = v2 / np.linalg.norm(v2)
+
+        alpha = -np.degrees(np.arccos(np.clip(np.dot(v1_u, v2_u), -1.0, 1.0)))
+        
+        print(ptSegm)
+        print(alpha)
+        print(axe)
+        
+        transform.Translate(ptSegm)
+        transform.RotateWXYZ(alpha, axe)
+        
+        transformFilter = vtkTransformFilter()
+        transformFilter.SetInputData(stent)
+        transformFilter.SetTransform(transform)
+        transformFilter.Update()
+        return transformFilter.GetUnstructuredGridOutput()
