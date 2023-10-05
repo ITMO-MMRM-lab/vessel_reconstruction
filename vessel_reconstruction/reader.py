@@ -6,6 +6,7 @@ import vtk
 from vtkmodules.all import (
     vtkSTLReader, 
     vtkXMLUnstructuredGridReader, 
+    vtkXMLPolyDataReader,
     vtkPoints, 
     vtkUnstructuredGrid,
     vtkIdList)
@@ -195,6 +196,12 @@ class Reader(object):
     
     def readUnstructuredGrid(self, filename):
         reader = vtkXMLUnstructuredGridReader()
+        reader.SetFileName(filename)
+        reader.Update()
+        return reader.GetOutput()
+
+    def readPolyData(self, filename):
+        reader = vtkXMLPolyDataReader()
         reader.SetFileName(filename)
         reader.Update()
         return reader.GetOutput()

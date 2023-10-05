@@ -2,7 +2,7 @@
 from reader import Reader
 from core import DataAlgorithms
 from mesher import runMesher
-from writer import writeDisplacementsCSV, writePolyDataAsSTL, printComparisonMeasurements, writeUnstructuredGrid
+from writer import writeDisplacementsCSV, writePolyDataAsSTL, printComparisonMeasurements, writeUnstructuredGrid, writePolyDataAsVTP
 import os
 
 
@@ -27,8 +27,12 @@ def main():
     reader.readStent()
     if not os.path.isfile(reader.config["CONFIG"]["PathStentVTU"]):
         writeUnstructuredGrid(reader.config["CONFIG"]["PathStentVTU"], reader.stent)
+    centerline = reader.readPolyData(reader.outpath + 'centerline.vtp')
 
-    writeUnstructuredGrid(reader.outpath + 'tranformStent.vtu', dataAlg.tranformStent(reader.stent, reader.bdsSegments, 13))
+    cline_smooth = dataAlg.smoothCenterline(centerline)
+
+    writePolyDataAsVTP(reader.outpath + 'centerline_smooth.vtp', cline_smooth)
+    writeUnstructuredGrid(reader.outpath + 'tranformStent2.vtu', dataAlg.tranformStent2(reader.stent, reader.bdsSegments, cline_smooth))
 
 
 if __name__ == '__main__':
