@@ -17,12 +17,12 @@ def main():
 
     dataAlg = DataAlgorithms(reader.volumeMesh, reader.lumenStl, reader.segms3DLumen, reader.bdsSegments, reader.data_list, reader.funcOffset)
 
-    printComparisonMeasurements(reader.data_list, dataAlg.cur_diams)
+    # printComparisonMeasurements(reader.data_list, dataAlg.cur_diams)
 
-    writeDisplacementsCSV('data/output/vessel_disp.csv', reader.volumeMesh.GetPoints(), dataAlg.displs, 10)
+    # writeDisplacementsCSV('data/output/vessel_disp.csv', reader.volumeMesh.GetPoints(), dataAlg.displs, 10)
 
-    for i in range(0, len(dataAlg.trajs)):
-        writePolyDataAsSTL('data/output/offsetVessel_' + str(i) + '.stl', dataAlg.trajs[i])
+    # for i in range(0, len(dataAlg.trajs)):
+    #     writePolyDataAsSTL('data/output/offsetVessel_' + str(i) + '.stl', dataAlg.trajs[i])
 
     reader.readStent()
     if not os.path.isfile(reader.config["CONFIG"]["PathStentVTU"]):

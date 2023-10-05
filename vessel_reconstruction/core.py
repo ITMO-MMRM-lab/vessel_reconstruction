@@ -7,7 +7,10 @@ from vtkmodules.all import (
     vtkPlane,
     vtkCutter,
     vtkTransform,
-    vtkTransformFilter)
+    vtkTransformFilter,
+    vtkUnstructuredGrid,
+    vtkPointSet)
+import vtk
 from scipy.interpolate import lagrange
 
 #-------------------------------------#
@@ -248,3 +251,105 @@ class DataAlgorithms(object):
         transformFilter.SetTransform(transform)
         transformFilter.Update()
         return transformFilter.GetUnstructuredGridOutput()
+
+    def tranformSegment(self, pointSet, p1, p2):
+        # 1 - moving the segment to the origin
+        transform1 = vtkTransform()
+        transform1.Translate(np.multiply(pointSet.GetCenter(), -1))
+        transformFilter1  = vtkTransformFilter()
+        transformFilter1.SetInputData(pointSet)
+        transformFilter1.SetTransform(transform1)
+        transformFilter1.Update()
+        pointSet = transformFilter1.GetOutput()
+
+        # 2 - moving the segment to the vessel
+        midPt = np.divide(np.sum([p1, p2], axis=0), 2.)
+
+        v1 = np.diff([p1, p2], axis=0)[0]
+        v2 = [0., 0., 1.]
+        axe = normalize(np.cross(v1, v2))
+
+        v1_u = v1 / np.linalg.norm(v1)
+        v2_u = v2 / np.linalg.norm(v2)
+
+        alpha = -np.degrees(np.arccos(np.clip(np.dot(v1_u, v2_u), -1.0, 1.0)))
+        print('alpha = ', alpha)
+
+        transform = vtkTransform()
+        transform.Translate(np.diff([pointSet.GetCenter(), midPt], axis=0)[0])
+        transform.RotateWXYZ(alpha, axe)
+        
+        
+        transformFilter = vtkTransformFilter()
+        transformFilter.SetInputData(pointSet)
+        transformFilter.SetTransform(transform)
+        transformFilter.Update()
+        return transformFilter.GetOutput().GetPoints()
+
+    def tranformStent2(self, stent, bdsSegments):
+        bdsStent = stent.GetBounds()
+        lenStent = bdsStent[5] - bdsStent[4]
+        midleSegm = int((bdsSegments[2] + bdsSegments[3]) / 2.) #TODO: see in the Issue 11.
+
+        leftcline = []
+        rightcline = []
+
+        sum = 0
+        i = 0
+        while sum < lenStent/2.:
+            sum += getDistance(self.cline[midleSegm - i], self.cline[midleSegm - (i + 1)])
+            leftcline.append([0., 0., -sum])
+            i += 1
+        leftId = midleSegm - i
+
+        sum = 0
+        i = 0
+        while sum < lenStent/2.:
+            sum += getDistance(self.cline[midleSegm + i], self.cline[midleSegm + (i + 1)])       
+            rightcline.append([0., 0., sum])     
+            i += 1
+
+        clineStent = list(reversed(leftcline)) + [[0., 0., 0.]] + rightcline
+
+        newPts = vtkPoints()
+        newPts.Allocate(stent.GetNumberOfPoints())
+        newPts.SetNumberOfPoints(stent.GetNumberOfPoints())
+
+        pts = stent.GetPoints()
+        
+        for i in range(0, len(clineStent)- 1 ):
+            tempListIds = []
+            segmPts = vtkPoints()
+            for j in range(0, stent.GetNumberOfPoints()):
+                pt = pts.GetPoint(j)
+                flg = True
+
+                p2f_init = np.diff([pt, clineStent[i]], axis=0)[0]
+                d_init = np.dot(p2f_init, [0., 0., 1.])
+                flg *= d_init <= 0
+                        
+                p2f_fin = np.diff([pt, clineStent[i+1]], axis=0)[0]
+                d_fin = np.dot(p2f_fin, [0., 0., 1.])
+                flg *= d_fin >= 0
+
+                if flg:
+                    tempListIds.append(j)
+                    segmPts.InsertNextPoint(pt)
+            pointSet = vtkPointSet()
+            pointSet.SetPoints(segmPts)
+            print(segmPts.GetNumberOfPoints())
+            trasformPts = self.tranformSegment(pointSet, self.cline[leftId + i], self.cline[leftId + i + 1])
+
+            for j in range(0, trasformPts.GetNumberOfPoints()):
+                newPts.SetPoint(tempListIds[j], trasformPts.GetPoint(j))
+
+        transformStent = vtkUnstructuredGrid()
+        transformStent.SetPoints(newPts)
+        transformStent.SetCells(vtk.VTK_HEXAHEDRON, stent.GetCells())
+        return transformStent
+
+
+
+
+        
+        
