@@ -1,11 +1,11 @@
-from vtkmodules.all import (
-    vtkPoints,
-    vtkPolyData,
-    vtkUnstructuredGrid,
-    vtkXMLPolyDataWriter,
-    vtkXMLUnstructuredGridWriter,
-    vtkSTLWriter)
 import numpy as np
+from vtkmodules.all import (
+    vtkPoints, 
+    vtkPolyData, 
+    vtkSTLWriter,
+    vtkUnstructuredGrid, 
+    vtkXMLPolyDataWriter,
+    vtkXMLUnstructuredGridWriter)
 
 
 def writeSegmentsCSV(filename, segments:list):

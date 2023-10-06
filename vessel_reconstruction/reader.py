@@ -1,17 +1,17 @@
-from core import *
 import configparser
-import pandas
-import numpy as np
-import vtk
-from vtkmodules.all import (
-    vtkSTLReader, 
-    vtkXMLUnstructuredGridReader, 
-    vtkXMLPolyDataReader,
-    vtkPoints, 
-    vtkUnstructuredGrid,
-    vtkIdList)
-from progress.bar import FillingCirclesBar
 import os
+
+import numpy as np
+import pandas
+import vtk
+from core import *
+from progress.bar import FillingCirclesBar
+from vtkmodules.all import (
+    vtkPoints, 
+    vtkSTLReader, 
+    vtkUnstructuredGrid,
+    vtkXMLPolyDataReader, 
+    vtkXMLUnstructuredGridReader)
 
 
 class Reader(object):

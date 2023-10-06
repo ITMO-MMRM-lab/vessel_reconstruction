@@ -1,19 +1,21 @@
 import sys
+
 import numpy as np
-from vtkmodules.all import (
-    vtkCellArray,
-    vtkPoints,
-    vtkPolyData,
-    vtkPlane,
-    vtkCutter,
-    vtkTransform,
-    vtkTransformFilter,
-    vtkUnstructuredGrid,
-    vtkSmoothPolyDataFilter,
-    vtkPointSet)
 import vtk
-from scipy.interpolate import lagrange
 from progress.bar import FillingCirclesBar
+from scipy.interpolate import lagrange
+from vtkmodules.all import (
+    vtkCellArray, 
+    vtkCutter, 
+    vtkPlane, 
+    vtkPoints,
+    vtkPointSet, 
+    vtkPolyData, 
+    vtkSmoothPolyDataFilter,
+    vtkTransform, 
+    vtkTransformFilter,
+    vtkUnstructuredGrid)
+
 
 #-------------------------------------#
 #some operations on vectors
@@ -226,33 +228,6 @@ class DataAlgorithms(object):
                 sumRad += getDistance(cline[i], pts.GetPoint(j))
             diams.append(sumRad*2./npts)
         return diams
-    
-    def tranformStent(self, stent, bdsSegments):
-        transform = vtkTransform()
-        midleSegm = int((bdsSegments[2] + bdsSegments[3]) / 2.)
-        ptSegm = self.cline[midleSegm]
-
-        v1 = np.diff([self.cline[midleSegm+10], self.cline[midleSegm-10]], axis=0)[0]
-        v2 = [0., 0., 1.]
-        axe = normalize(np.cross(v1, v2))
-
-        v1_u = v1 / np.linalg.norm(v1)
-        v2_u = v2 / np.linalg.norm(v2)
-
-        alpha = -np.degrees(np.arccos(np.clip(np.dot(v1_u, v2_u), -1.0, 1.0)))
-        
-        print(ptSegm)
-        print(alpha)
-        print(axe)
-        
-        transform.Translate(ptSegm)
-        transform.RotateWXYZ(alpha, axe)
-        
-        transformFilter = vtkTransformFilter()
-        transformFilter.SetInputData(stent)
-        transformFilter.SetTransform(transform)
-        transformFilter.Update()
-        return transformFilter.GetUnstructuredGridOutput()
 
     def tranformSegment(self, pointSet, p1, p2):
         # 1 - moving the segment to the origin
@@ -280,14 +255,13 @@ class DataAlgorithms(object):
         transform.Translate(np.diff([pointSet.GetCenter(), midPt], axis=0)[0])
         transform.RotateWXYZ(alpha, axe)
         
-        
         transformFilter = vtkTransformFilter()
         transformFilter.SetInputData(pointSet)
         transformFilter.SetTransform(transform)
         transformFilter.Update()
         return transformFilter.GetOutput().GetPoints()
 
-    def tranformStent2(self, stent, bdsSegments, centerLine):
+    def tranformStent(self, stent, bdsSegments, centerLine):
         bdsStent = stent.GetBounds()
         lenStent = bdsStent[5] - bdsStent[4]
         midleSegm = int((bdsSegments[2] + bdsSegments[3]) / 2.) #TODO: see in the Issue 11.
@@ -301,11 +275,9 @@ class DataAlgorithms(object):
                 dist = curdist
                 midleId = i
         midleSegm = midleId
-            
-
+        
         leftcline = []
         rightcline = []
-
         sum = 0
         i = 0
         while sum < lenStent/2.:
@@ -326,7 +298,6 @@ class DataAlgorithms(object):
         newPts = vtkPoints()
         newPts.Allocate(stent.GetNumberOfPoints())
         newPts.SetNumberOfPoints(stent.GetNumberOfPoints())
-
         pts = stent.GetPoints()
 
         suffix = '%(percent)d%% [%(elapsed_td)s / %(eta_td)s]'
