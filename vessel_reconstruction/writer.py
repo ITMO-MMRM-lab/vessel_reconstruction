@@ -1,9 +1,11 @@
-from vtkmodules.all import (
-    vtkPoints,
-    vtkPolyData,
-    vtkXMLPolyDataWriter,
-    vtkSTLWriter)
 import numpy as np
+from vtkmodules.all import (
+    vtkPoints, 
+    vtkPolyData, 
+    vtkSTLWriter,
+    vtkUnstructuredGrid, 
+    vtkXMLPolyDataWriter,
+    vtkXMLUnstructuredGridWriter)
 
 
 def writeSegmentsCSV(filename, segments:list):
@@ -26,6 +28,12 @@ def writePolyDataAsSTL(filename, polydata):
 def writePolyDataAsVTP(filename, polydata: vtkPolyData):
     writer = vtkXMLPolyDataWriter()
     writer.SetInputData(polydata)
+    writer.SetFileName(filename)
+    writer.Write()
+
+def writeUnstructuredGrid(filename, ugrid: vtkUnstructuredGrid):
+    writer = vtkXMLUnstructuredGridWriter()
+    writer.SetInputData(ugrid)
     writer.SetFileName(filename)
     writer.Write()
 

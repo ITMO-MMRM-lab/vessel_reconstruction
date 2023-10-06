@@ -1,12 +1,21 @@
 import sys
+
 import numpy as np
-from vtkmodules.all import (
-    vtkCellArray,
-    vtkPoints,
-    vtkPolyData,
-    vtkPlane,
-    vtkCutter)
+import vtk
+from progress.bar import FillingCirclesBar
 from scipy.interpolate import lagrange
+from vtkmodules.all import (
+    vtkCellArray, 
+    vtkCutter, 
+    vtkPlane, 
+    vtkPoints,
+    vtkPointSet, 
+    vtkPolyData, 
+    vtkSmoothPolyDataFilter,
+    vtkTransform, 
+    vtkTransformFilter,
+    vtkUnstructuredGrid)
+
 
 #-------------------------------------#
 #some operations on vectors
@@ -219,3 +228,123 @@ class DataAlgorithms(object):
                 sumRad += getDistance(cline[i], pts.GetPoint(j))
             diams.append(sumRad*2./npts)
         return diams
+
+    def tranformSegment(self, pointSet, p1, p2):
+        # 1 - moving the segment to the origin
+        transform1 = vtkTransform()
+        transform1.Translate(np.multiply(pointSet.GetCenter(), -1))
+        transformFilter1  = vtkTransformFilter()
+        transformFilter1.SetInputData(pointSet)
+        transformFilter1.SetTransform(transform1)
+        transformFilter1.Update()
+        pointSet = transformFilter1.GetOutput()
+
+        # 2 - moving the segment to the vessel
+        midPt = np.divide(np.sum([p1, p2], axis=0), 2.)
+
+        v1 = np.diff([p1, p2], axis=0)[0]
+        v2 = [0., 0., 1.]
+        axe = normalize(np.cross(v1, v2))
+
+        v1_u = v1 / np.linalg.norm(v1)
+        v2_u = v2 / np.linalg.norm(v2)
+
+        alpha = -np.degrees(np.arccos(np.clip(np.dot(v1_u, v2_u), -1.0, 1.0)))
+
+        transform = vtkTransform()
+        transform.Translate(np.diff([pointSet.GetCenter(), midPt], axis=0)[0])
+        transform.RotateWXYZ(alpha, axe)
+        
+        transformFilter = vtkTransformFilter()
+        transformFilter.SetInputData(pointSet)
+        transformFilter.SetTransform(transform)
+        transformFilter.Update()
+        return transformFilter.GetOutput().GetPoints()
+
+    def tranformStent(self, stent, bdsSegments, centerLine):
+        bdsStent = stent.GetBounds()
+        lenStent = bdsStent[5] - bdsStent[4]
+        midleSegm = int((bdsSegments[2] + bdsSegments[3]) / 2.) #TODO: see in the Issue 11.
+
+        clinePts = centerLine.GetPoints()
+        dist = np.inf
+        midleId = 0
+        for i in range(0, clinePts.GetNumberOfPoints()):
+            curdist = getDistance(self.cline[midleSegm], clinePts.GetPoint(i))
+            if(curdist < dist):
+                dist = curdist
+                midleId = i
+        midleSegm = midleId
+        
+        leftcline = []
+        rightcline = []
+        sum = 0
+        i = 0
+        while sum < lenStent/2.:
+            sum += getDistance(clinePts.GetPoint(midleSegm - i), clinePts.GetPoint(midleSegm - (i + 1)))
+            leftcline.append([0., 0., -sum])
+            i += 1
+        leftId = midleSegm - i
+
+        sum = 0
+        i = 0
+        while sum < lenStent/2.:
+            sum += getDistance(clinePts.GetPoint(midleSegm + i), clinePts.GetPoint(midleSegm + (i + 1)))       
+            rightcline.append([0., 0., sum])     
+            i += 1
+
+        clineStent = list(reversed(leftcline)) + [[0., 0., 0.]] + rightcline
+
+        newPts = vtkPoints()
+        newPts.Allocate(stent.GetNumberOfPoints())
+        newPts.SetNumberOfPoints(stent.GetNumberOfPoints())
+        pts = stent.GetPoints()
+
+        suffix = '%(percent)d%% [%(elapsed_td)s / %(eta_td)s]'
+        progress_bar = FillingCirclesBar('Stent transformation: ', suffix=suffix, max = len(clineStent)-1)
+
+        for i in range(0, len(clineStent)- 1):    
+            progress_bar.next()        
+            tempListIds = []
+            segmPts = vtkPoints()
+            for j in range(0, stent.GetNumberOfPoints()):
+                pt = pts.GetPoint(j)
+                flg = True
+
+                p2f_init = np.diff([pt, clineStent[i]], axis=0)[0]
+                d_init = np.dot(p2f_init, [0., 0., 1.])
+                flg *= d_init < 0
+                        
+                p2f_fin = np.diff([pt, clineStent[i+1]], axis=0)[0]
+                d_fin = np.dot(p2f_fin, [0., 0., 1.])
+                flg *= d_fin > 0
+
+                if flg:
+                    tempListIds.append(j)
+                    segmPts.InsertNextPoint(pt)
+            pointSet = vtkPointSet()
+            pointSet.SetPoints(segmPts)
+            trasformPts = self.tranformSegment(pointSet, clinePts.GetPoint(leftId + i), clinePts.GetPoint(leftId + i + 1))
+
+            for j in range(0, trasformPts.GetNumberOfPoints()):
+                newPts.SetPoint(tempListIds[j], trasformPts.GetPoint(j))
+        print('\n')
+        transformStent = vtkUnstructuredGrid()
+        transformStent.SetPoints(newPts)
+        transformStent.SetCells(vtk.VTK_HEXAHEDRON, stent.GetCells())
+        return transformStent
+
+    def smoothCenterline(self, centerline):
+        smooth = vtkSmoothPolyDataFilter()
+        smooth.SetInputData(centerline)
+        smooth.SetNumberOfIterations(150)
+        smooth.SetRelaxationFactor(0.15)
+        smooth.FeatureEdgeSmoothingOn()
+        smooth.BoundarySmoothingOn()
+        smooth.Update()
+        return smooth.GetOutput()
+
+
+
+        
+        

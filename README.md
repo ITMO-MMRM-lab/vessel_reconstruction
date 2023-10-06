@@ -25,6 +25,7 @@ $ python vessel_reconstruction/__main__.py
 ## [Requirements](requirements.txt)
 - [numpy](https://numpy.org/)=1.25.2
 - [pandas](https://pandas.pydata.org/)=2.1.0
+- [progress](https://pypi.org/project/progress/)=1.6
 - [pygalmesh](https://github.com/meshpro/pygalmesh)=0.10.7
 - [python](https://www.python.org/)=3.10.12
 - [scipy](https://scipy.org/)=1.11.2
