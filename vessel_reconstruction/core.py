@@ -292,6 +292,7 @@ class DataAlgorithms(object):
             sum += getDistance(clinePts.GetPoint(midleSegm + i), clinePts.GetPoint(midleSegm + (i + 1)))       
             rightcline.append([0., 0., sum])     
             i += 1
+        rightId = midleSegm + i
 
         clineStent = list(reversed(leftcline)) + [[0., 0., 0.]] + rightcline
 
@@ -324,7 +325,7 @@ class DataAlgorithms(object):
                     segmPts.InsertNextPoint(pt)
             pointSet = vtkPointSet()
             pointSet.SetPoints(segmPts)
-            trasformPts = self.tranformSegment(pointSet, clinePts.GetPoint(leftId + i), clinePts.GetPoint(leftId + i + 1))
+            trasformPts = self.tranformSegment(pointSet, clinePts.GetPoint(rightId + i), clinePts.GetPoint(rightId + i + 1))
 
             for j in range(0, trasformPts.GetNumberOfPoints()):
                 newPts.SetPoint(tempListIds[j], trasformPts.GetPoint(j))
@@ -344,6 +345,51 @@ class DataAlgorithms(object):
         smooth.Update()
         return smooth.GetOutput()
 
+    def smoothCenterline2(self, centerline, refinements=8):
+        pts = []
+        vtkPts = centerline.GetPoints()
+        for i in range(vtkPts.GetNumberOfPoints()):
+            pts.append(vtkPts.GetPoint(i))
+
+        # Chaikin’s corner cutting algorithm:
+        pts = np.array(pts)
+
+        for _ in range(refinements):
+            L = pts.repeat(2, axis=0)
+            R = np.empty_like(L)
+            R[0] = L[0]
+            R[2::2] = L[1:-1:2]
+            R[1:-1:2] = L[2::2]
+            R[-1] = L[-1]
+            pts = L * 0.75 + R * 0.25
+
+        # Densification:
+        min_dist = 2.0 * 0.036 # Length of FE of stent 
+
+        newPts = []
+        i = 0
+        count = 0
+        while i < len(pts):
+            if count == 0:
+                newPts.append(pts[i])
+                count += 1
+            dist = getDistance(newPts[-1], pts[i + count])
+            if dist >= min_dist:
+                i = i + count
+                count = 0
+            else:
+                count += 1        
+            if i + count >= len(pts):
+                newPts.append(pts[-1])
+                break
+
+        newVtkPts = vtkPoints()
+        for pt in newPts:
+            newVtkPts.InsertNextPoint(pt)
+        newCenterline = vtkPolyData()
+        newCenterline.SetPoints(newVtkPts)
+        
+        return newCenterline
 
 
         

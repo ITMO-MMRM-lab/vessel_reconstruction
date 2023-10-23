@@ -211,19 +211,22 @@ class Reader(object):
             ptIds = []
             pts = vtkPoints()
             stent = vtkUnstructuredGrid()
+            suffix = '%(percent)d%% [%(elapsed_td)s / %(eta_td)s]'
 
             with open(self.config["CONFIG"]["PathStentNodes"]) as fNodes:
                 lines = fNodes.readlines()
+                progress_bar = FillingCirclesBar('Read stent_nodes.csv:    ', suffix=suffix, max = len(lines))
                 for i in range(0, len(lines)):
+                    progress_bar.next()
                     line = lines[i].split('\t')
                     ptIds.append(int(line[0]))
                     pts.InsertNextPoint([float(line[1]), float(line[2]), float(line[3])])   
             stent.SetPoints(pts)
-
+            print('\n')
             with open(self.config["CONFIG"]["PathStentElements"]) as fElems:
                 lines = fElems.readlines()
                 stent.Allocate(len(lines))
-                suffix = '%(percent)d%% [%(elapsed_td)s / %(eta_td)s]'
+                
                 progress_bar = FillingCirclesBar('Read stent_elements.csv: ', suffix=suffix, max = len(lines))
                 for i in range(0, len(lines)):
                     progress_bar.next()

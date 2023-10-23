@@ -35,7 +35,7 @@ def main():
         writeUnstructuredGrid(reader.config["CONFIG"]["PathStentVTU"], reader.stent)
     centerline = reader.readPolyData(reader.outpath + 'centerline.vtp')
 
-    cline_smooth = dataAlg.smoothCenterline(centerline)
+    cline_smooth = dataAlg.smoothCenterline2(centerline)
 
     writePolyDataAsVTP(reader.outpath + 'centerline_smooth.vtp', cline_smooth)
     writeUnstructuredGrid(reader.outpath + 'tranformStent.vtu', dataAlg.tranformStent(reader.stent, reader.bdsSegments, cline_smooth))
