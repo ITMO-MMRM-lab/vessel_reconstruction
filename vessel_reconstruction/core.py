@@ -229,8 +229,9 @@ class DataAlgorithms(object):
             diams.append(sumRad*2./npts)
         return diams
 
-    def tranformSegment(self, pointSet, p1, p2):
+    def tranformSegmentOLD(self, pointSet, p1, p2):
         # 1 - moving the segment to the origin
+        center = pointSet.GetCenter()
         transform1 = vtkTransform()
         transform1.Translate(np.multiply(pointSet.GetCenter(), -1))
         transformFilter1  = vtkTransformFilter()
@@ -241,6 +242,7 @@ class DataAlgorithms(object):
 
         # 2 - moving the segment to the vessel
         midPt = np.divide(np.sum([p1, p2], axis=0), 2.)
+        # midPt = p1
 
         v1 = np.diff([p1, p2], axis=0)[0]
         v2 = [0., 0., 1.]
@@ -253,15 +255,139 @@ class DataAlgorithms(object):
 
         transform = vtkTransform()
         transform.Translate(np.diff([pointSet.GetCenter(), midPt], axis=0)[0])
+        # transform.Translate(center)
         transform.RotateWXYZ(alpha, axe)
         
         transformFilter = vtkTransformFilter()
         transformFilter.SetInputData(pointSet)
         transformFilter.SetTransform(transform)
         transformFilter.Update()
-        return transformFilter.GetOutput().GetPoints()
+        return [transformFilter.GetOutput(), axe]
+    
+
+    def tranformSegment(self, segmsList, clinePts, rightId):
+        axes = []
+        betta = 0.0
+        for i in range(0, len(segmsList)):
+            [segmsList[i], axeI] = self.tranformSegmentOLD(segmsList[i], clinePts.GetPoint(rightId + i), clinePts.GetPoint(rightId + i + 1))
+            axes.append(axeI)
+        
+        # for i in range(0, len(segmsList)):
+        #     v1 = axes[i]
+        #     v2 = [0., 1., 0.]
+        #     v1_u = v1 / np.linalg.norm(v1)
+        #     v2_u = v2 / np.linalg.norm(v2)
+        #     betta = -np.degrees(np.arccos(np.clip(np.dot(v1_u, v2_u), -1.0, 1.0)))
+        #     center = segmsList[i].GetCenter()
+
+        #     transform  = vtkTransform()
+        #     transform.Translate(np.multiply(center, 1))
+        #     transform.RotateWXYZ(betta, normalize(np.diff([clinePts.GetPoint(rightId + i), clinePts.GetPoint(rightId + i + 1)], axis=0)[0]))
+        #     transform.Translate(np.multiply(center, -1))
+
+        #     transformFilter = vtkTransformFilter()
+        #     transformFilter.SetInputData(segmsList[i])
+        #     transformFilter.SetTransform(transform)
+        #     transformFilter.Update()
+
+        #     segmsList[i] = transformFilter.GetOutput()
+        return segmsList
+
+
+
 
     def tranformStent(self, stent, bdsSegments, centerLine):
+        bdsStent = stent.GetBounds()
+        lenStent = bdsStent[5] - bdsStent[4]
+        midleSegm = int((bdsSegments[2] + bdsSegments[3]) / 2.) #TODO: see in the Issue 11.
+
+        clinePts = centerLine.GetPoints()
+        dist = np.inf
+        midleId = 0
+        for i in range(0, clinePts.GetNumberOfPoints()):
+            curdist = getDistance(self.cline[midleSegm], clinePts.GetPoint(i))
+            if(curdist < dist):
+                dist = curdist
+                midleId = i
+        midleSegm = midleId
+        
+        leftcline = []
+        rightcline = []
+        sum = 0
+        i = 0
+        while sum < lenStent/2.:
+            sum += getDistance(clinePts.GetPoint(midleSegm - i), clinePts.GetPoint(midleSegm - (i + 1)))
+            leftcline.append([0., 0., -sum])
+            i += 1
+        leftId = midleSegm - i
+
+        sum = 0
+        i = 0
+        while sum < lenStent/2.:
+            sum += getDistance(clinePts.GetPoint(midleSegm + i), clinePts.GetPoint(midleSegm + (i + 1)))       
+            rightcline.append([0., 0., sum])     
+            i += 1
+        rightId = midleSegm + i
+
+        clineStent = list(reversed(leftcline)) + [[0., 0., 0.]] + rightcline
+
+        newPts = vtkPoints()
+        newPts.Allocate(stent.GetNumberOfPoints())
+        newPts.SetNumberOfPoints(stent.GetNumberOfPoints())
+        pts = stent.GetPoints()
+
+        suffix = '%(percent)d%% [%(elapsed_td)s / %(eta_td)s]'
+        progress_bar = FillingCirclesBar('Stent transformation: ', suffix=suffix, max = len(clineStent)-1)
+
+        segmsList = []
+        ListsIDS = []
+        # for i in range(0, len(clineStent)- 1):    
+        #     progress_bar.next()        
+        #     tempListIds = []
+        #     segmPts = vtkPoints()
+        #     for j in range(0, stent.GetNumberOfPoints()):
+        #         pt = pts.GetPoint(j)
+        #         flg = True
+
+        #         p2f_init = np.diff([pt, clineStent[i]], axis=0)[0]
+        #         d_init = np.dot(p2f_init, [0., 0., 1.])
+        #         flg *= d_init < 0
+                        
+        #         p2f_fin = np.diff([pt, clineStent[i+1]], axis=0)[0]
+        #         d_fin = np.dot(p2f_fin, [0., 0., 1.])
+        #         flg *= d_fin > 0
+
+        #         if flg:
+        #             tempListIds.append(j)
+        #             segmPts.InsertNextPoint(pt)
+        #     pointSet = vtkPointSet()
+        #     pointSet.SetPoints(segmPts)
+
+        #     segmsList.append(pointSet)
+        #     ListsIDS.append(tempListIds)
+
+            # trasformPts = self.tranformSegment(pointSet, clinePts.GetPoint(rightId + i), clinePts.GetPoint(rightId + i + 1))
+
+            # for j in range(0, trasformPts.GetNumberOfPoints()):
+            #     newPts.SetPoint(tempListIds[j], trasformPts.GetPoint(j))
+
+
+        pointSet = vtkPointSet()
+        pointSet.SetPoints(pts)
+        segmsList.append(pointSet)
+        segmsList = self.tranformSegment(segmsList, clinePts, rightId)
+        for i in range(0, len(segmsList)):
+            for j in range(0, segmsList[i].GetNumberOfPoints()):
+                newPts.SetPoint(j, segmsList[i].GetPoint(j))
+
+
+        print('\n')
+        transformStent = vtkUnstructuredGrid()
+        transformStent.SetPoints(newPts)
+        transformStent.SetCells(vtk.VTK_HEXAHEDRON, stent.GetCells())
+        return transformStent
+    
+    def tranformStentOLD(self, stent, bdsSegments, centerLine):
         bdsStent = stent.GetBounds()
         lenStent = bdsStent[5] - bdsStent[4]
         midleSegm = int((bdsSegments[2] + bdsSegments[3]) / 2.) #TODO: see in the Issue 11.
@@ -325,6 +451,7 @@ class DataAlgorithms(object):
                     segmPts.InsertNextPoint(pt)
             pointSet = vtkPointSet()
             pointSet.SetPoints(segmPts)
+
             trasformPts = self.tranformSegment(pointSet, clinePts.GetPoint(rightId + i), clinePts.GetPoint(rightId + i + 1))
 
             for j in range(0, trasformPts.GetNumberOfPoints()):
@@ -345,7 +472,7 @@ class DataAlgorithms(object):
         smooth.Update()
         return smooth.GetOutput()
 
-    def smoothCenterline2(self, centerline, refinements=8):
+    def smoothCenterline2(self, centerline, refinements=10):
         pts = []
         vtkPts = centerline.GetPoints()
         for i in range(vtkPts.GetNumberOfPoints()):
@@ -364,7 +491,7 @@ class DataAlgorithms(object):
             pts = L * 0.75 + R * 0.25
 
         # Densification:
-        min_dist = 2.0 * 0.036 # Length of FE of stent 
+        min_dist = 30.0 * 0.036 # Length (max) of FE of stent 
 
         newPts = []
         i = 0

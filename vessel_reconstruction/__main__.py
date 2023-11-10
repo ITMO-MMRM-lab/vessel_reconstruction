@@ -33,12 +33,14 @@ def main():
     reader.readStent()
     if not os.path.isfile(reader.config["CONFIG"]["PathStentVTU"]):
         writeUnstructuredGrid(reader.config["CONFIG"]["PathStentVTU"], reader.stent)
+    
     centerline = reader.readPolyData(reader.outpath + 'centerline.vtp')
+    writePolyDataAsSTL('cline.stl', centerline)
 
     cline_smooth = dataAlg.smoothCenterline2(centerline)
 
     writePolyDataAsVTP(reader.outpath + 'centerline_smooth.vtp', cline_smooth)
-    writeUnstructuredGrid(reader.outpath + 'tranformStent.vtu', dataAlg.tranformStent(reader.stent, reader.bdsSegments, cline_smooth))
+    writeUnstructuredGrid(reader.outpath + 'tranformStent-temp.vtu', dataAlg.tranformStent(reader.stent, reader.bdsSegments, cline_smooth))
 
 
 if __name__ == '__main__':
