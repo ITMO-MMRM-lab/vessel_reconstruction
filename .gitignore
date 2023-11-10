@@ -6,6 +6,17 @@ __pycache__/
 # C extensions
 *.so
 
+# VScode C++
+*.json
+*.vscode
+
+# Data
+*.stl 
+*.vtp
+*.vtk 
+*.vtu 
+*.csv 
+
 # Distribution / packaging
 .Python
 build/
